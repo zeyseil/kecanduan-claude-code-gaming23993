@@ -5,6 +5,16 @@ Aplikasi personal pencatat komik terbaca, dibungkus untuk Desktop (Tauri) dan An
 
 **Proyek ini greenfield.** Ada source code aplikasi lama (Spring Boot + MySQL, AI Gemini langsung tanpa Langflow) yang pernah dibuat — itu HANYA referensi desain (lihat SPEC.md §8 untuk insight yang diambil), JANGAN diasumsikan sebagai kode yang dilanjutkan atau di-porting. Backend/database untuk proyek ini dibangun dari nol sesuai stack di atas (Langflow/DataStax/Astra DB/Cloudflare Worker).
 
+## Status Implementasi (per sesi terakhir)
+Slice pertama frontend selesai (PR #2, branch `feat/frontend-mock-ui`, base `docs/add-readme`):
+- Monorepo **pnpm workspaces**; app web di `apps/web` (React 18 + Vite 5 + TypeScript + Tailwind 3).
+- pnpm dijalankan via `corepack pnpm@9.15.9` — pnpm 11 crash di Node 21.0.0 environment ini.
+- Tipe `Comic` di `apps/web/src/types/comic.ts` menegakkan `is_adult` terpisah dari `type_tag`, `latest_chapter` numeric, `status` enum.
+- Halaman **Daftar Komik** (`routes/DaftarKomik.tsx`) + **Tulis** (`routes/Tulis.tsx`) jalan dengan **data mock** (`mocks/comics.ts`) — BELUM ada network/Worker/Langflow/DB.
+- Logika sort/filter/search murni di `lib/comicList.ts` (di-unit-test). Test: `pnpm --filter web test` (16 hijau).
+- Perintah: `pnpm --filter web dev|build|test|lint`.
+- BELUM dibuat: `apps/worker` (Hono), wrapper Tauri & Capacitor, semua endpoint tool & integrasi backend.
+
 ## Stack
 - Frontend: React, dibungkus Tauri (desktop) & Capacitor (Android) — satu codebase
 - Backend perantara: Cloudflare Worker
