@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { selectComics, DEFAULT_OPTIONS } from "./comicList";
+import { selectComics, selectRecent, DEFAULT_OPTIONS } from "./comicList";
 import type { Comic } from "../types/comic";
 
 function comic(overrides: Partial<Comic>): Comic {
@@ -114,5 +114,23 @@ describe("selectComics", () => {
       search: "ber",
     });
     expect(result.map((c) => c.comic_id)).toEqual(["a"]);
+  });
+});
+
+describe("selectRecent", () => {
+  it("mengurutkan desc by updated_at dan membatasi ke limit", () => {
+    const result = selectRecent(sample, 2);
+    expect(result.map((c) => c.comic_id)).toEqual(["b", "c"]);
+  });
+
+  it("tidak memutasi array input", () => {
+    const copy = [...sample];
+    selectRecent(sample, 2);
+    expect(sample).toEqual(copy);
+  });
+
+  it("mengembalikan seluruhnya kalau limit melebihi panjang array", () => {
+    const result = selectRecent(sample, 10);
+    expect(result).toHaveLength(3);
   });
 });
