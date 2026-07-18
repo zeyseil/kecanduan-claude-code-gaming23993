@@ -60,11 +60,34 @@ export class GeminiError extends Error {
   }
 }
 
-// Model name is configurable via env.GEMINI_MODEL. If Google renames or
-// retires this one, override the env var — no code change needed.
-export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
+// `-latest` is a stable alias Google maintains, so a model rename doesn't
+// break us. Flash-Lite specifically, for a reason found during end-to-end
+// testing: the free tier caps requests *per model per day* (20/day for
+// gemini-3.5-flash, which `gemini-flash-latest` resolves to). One agent run
+// costs 4-6 requests because every tool-calling turn is its own request, so
+// that cap allows only ~3-5 runs/day. Flash-Lite has its own separate quota
+// and is more than capable of this task (structured extraction + tool
+// selection, not deep reasoning). Override via env.GEMINI_MODEL.
+export const DEFAULT_GEMINI_MODEL = "gemini-flash-lite-latest";
 
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+
+// Gemini's free Flash tier returns 503 "experiencing high demand" fairly often —
+// observed repeatedly during end-to-end testing. Without retries a single blip
+// aborts the whole agent run, and because tool side effects are NOT rolled back,
+// that can leave a comic created but its cover never fetched. Retrying here is
+// the cheapest way to keep a run whole.
+//
+// 429 is deliberately NOT retried: it means the daily free-tier quota is gone,
+// and Google's own RetryInfo asks for ~57s — far beyond a sensible in-request
+// backoff. Retrying would just stall the user before failing anyway.
+// Kept short on purpose: observed 503 spikes lasted minutes, so a long backoff
+// just stalls the user before failing anyway. This only rescues brief blips.
+const RETRYABLE_STATUSES = new Set([500, 502, 503, 504]);
+const MAX_ATTEMPTS = 3;
+const BASE_BACKOFF_MS = 500;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function generateContent(params: {
   apiKey: string;
@@ -75,31 +98,50 @@ export async function generateContent(params: {
 }): Promise<Part[]> {
   const { apiKey, model, systemInstruction, contents, functionDeclarations } = params;
 
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE}/${model}:generateContent`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // Header auth rather than `?key=` so the user's API key never lands
-        // in a URL (and therefore never in request logs).
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemInstruction }] },
-        contents,
-        tools: [{ functionDeclarations }],
-      }),
-    });
-  } catch (cause) {
-    throw new GeminiError(`Tidak bisa menghubungi Gemini: ${String(cause)}`);
-  }
+  const body = JSON.stringify({
+    systemInstruction: { parts: [{ text: systemInstruction }] },
+    contents,
+    tools: [{ functionDeclarations }],
+  });
 
-  if (!res.ok) {
+  let lastError: GeminiError | null = null;
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      await sleep(BASE_BACKOFF_MS * 2 ** (attempt - 1));
+    }
+
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}/${model}:generateContent`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // Header auth rather than `?key=` so the user's API key never lands
+          // in a URL (and therefore never in request logs).
+          "x-goog-api-key": apiKey,
+        },
+        body,
+      });
+    } catch (cause) {
+      // Network-level failure: also worth retrying.
+      lastError = new GeminiError(`Tidak bisa menghubungi Gemini: ${String(cause)}`);
+      continue;
+    }
+
+    if (res.ok) {
+      const parsed = (await res.json()) as GenerateContentResponse;
+      return parsed.candidates?.[0]?.content?.parts ?? [];
+    }
+
     const detail = await res.text().catch(() => "");
-    throw new GeminiError("Gemini menolak permintaan", res.status, detail);
+    lastError = new GeminiError("Gemini menolak permintaan", res.status, detail);
+
+    // 4xx other than 429 means the request itself is wrong (bad key, bad
+    // model, malformed body) — retrying would just repeat the same failure.
+    if (!RETRYABLE_STATUSES.has(res.status)) break;
+    console.warn(`Gemini ${res.status}, percobaan ${attempt + 1}/${MAX_ATTEMPTS}`);
   }
 
-  const body = (await res.json()) as GenerateContentResponse;
-  return body.candidates?.[0]?.content?.parts ?? [];
+  throw lastError ?? new GeminiError("Gemini gagal tanpa detail");
 }

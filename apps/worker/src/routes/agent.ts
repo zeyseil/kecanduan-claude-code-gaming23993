@@ -14,6 +14,24 @@ export const agent = new Hono<{ Bindings: Env; Variables: { userId: string } }>(
 
 agent.use("/process", userAuth, rateLimit);
 
+/** Gemini's raw errors are opaque to an end user ("Gemini menolak permintaan"
+ * says nothing actionable), so the common failures get a plain explanation. */
+function explainGeminiError(err: GeminiError): string {
+  if (err.status === 429) {
+    return "Kuota harian API key Gemini kamu sudah habis. Free tier dibatasi per model per hari, dan satu proses memakai beberapa request. Coba lagi besok, ganti API key, atau set GEMINI_MODEL ke model lain.";
+  }
+  if (err.status === 503) {
+    return "Model Gemini sedang penuh (high demand). Ini biasanya sementara — coba lagi sebentar lagi.";
+  }
+  if (err.status === 400 || err.status === 403) {
+    return "API key Gemini ditolak. Pastikan key-nya benar dan aktif di aistudio.google.com/apikey.";
+  }
+  if (err.status === 404) {
+    return "Model Gemini tidak ditemukan — kemungkinan namanya sudah berubah. Set GEMINI_MODEL ke model yang berlaku.";
+  }
+  return err.message;
+}
+
 agent.post("/process", async (c) => {
   const body = await c.req.json<AgentProcessBody>().catch(() => ({}) as AgentProcessBody);
 
@@ -36,7 +54,7 @@ agent.post("/process", async (c) => {
   } catch (err) {
     if (err instanceof GeminiError) {
       return c.json(
-        { error: err.message, gemini_status: err.status, detail: err.detail },
+        { error: explainGeminiError(err), gemini_status: err.status, detail: err.detail },
         502,
       );
     }

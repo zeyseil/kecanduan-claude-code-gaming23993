@@ -396,11 +396,61 @@ describe("/agent/process", () => {
     expect(logDocs[0]).toMatchObject({ ai_action: "ambiguous", confirmed: false });
   });
 
-  it("returns 502 when Gemini responds with an error status", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("bad key", { status: 400 })));
+  it("returns 502 with a plain-language message when the API key is rejected", async () => {
+    const fetchMock = vi.fn(async () => new Response("bad key", { status: 400 }));
+    vi.stubGlobal("fetch", fetchMock);
 
     const res = await request({ teks_input: "test", google_api_key: "salah" });
     expect(res.status).toBe(502);
+    expect((await res.json()) as { error: string }).toMatchObject({
+      error: expect.stringContaining("API key Gemini ditolak"),
+    });
+    // 4xx (other than 429) is the caller's fault — retrying is pointless.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("explains a 429 as an exhausted quota and does not retry it", async () => {
+    const fetchMock = vi.fn(async () => new Response("quota", { status: 429 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await request({ teks_input: "test", google_api_key: "gk-1" });
+    expect(res.status).toBe(502);
+    expect((await res.json()) as { error: string }).toMatchObject({
+      error: expect.stringContaining("Kuota harian"),
+    });
+    // Google asks for a ~57s wait on quota errors; an in-request retry can't help.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a transient 503 and succeeds", async () => {
+    let calls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        calls++;
+        if (calls === 1) return new Response("busy", { status: 503 });
+        return geminiReply([{ text: "berhasil setelah retry" }]);
+      }),
+    );
+
+    const res = await request({ teks_input: "test", google_api_key: "gk-1" });
+    expect(res.status).toBe(200);
+    expect((await res.json()) as { message: string }).toMatchObject({
+      message: "berhasil setelah retry",
+    });
+    expect(calls).toBe(2);
+  });
+
+  it("gives up after MAX_ATTEMPTS of 503", async () => {
+    const fetchMock = vi.fn(async () => new Response("busy", { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await request({ teks_input: "test", google_api_key: "gk-1" });
+    expect(res.status).toBe(502);
+    expect((await res.json()) as { error: string }).toMatchObject({
+      error: expect.stringContaining("sedang penuh"),
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("returns 502 when the Gemini request throws (network/timeout)", async () => {
