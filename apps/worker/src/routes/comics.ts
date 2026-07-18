@@ -4,6 +4,7 @@ import type { Comic, Status, TypeTag } from "../types/comic";
 import { TYPE_TAGS, STATUSES } from "../types/comic";
 import { getComicStore } from "../store/comicStore";
 import { userAuth } from "../middleware/userAuth";
+import { rateLimit } from "../middleware/rateLimit";
 
 interface CreateComicBody {
   title?: unknown;
@@ -42,7 +43,7 @@ function validateCreateBody(body: CreateComicBody): string | null {
 
 export const comics = new Hono<{ Bindings: Env; Variables: { userId: string } }>();
 
-comics.use("*", userAuth);
+comics.use("*", userAuth, rateLimit);
 
 comics.get("/", async (c) => {
   const store = getComicStore(c.env);
