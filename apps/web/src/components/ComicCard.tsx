@@ -9,9 +9,11 @@ const TYPE_LABEL: Record<Comic["type_tag"], string> = {
 
 interface ComicCardProps {
   comic: Comic;
+  /** Kalau tidak diisi, tombol update chapter disembunyikan (mis. dipakai di RecentStrip). */
+  onUpdateChapter?: (comic: Comic) => void;
 }
 
-export function ComicCard({ comic }: ComicCardProps) {
+export function ComicCard({ comic, onUpdateChapter }: ComicCardProps) {
   return (
     <article className="group flex flex-col overflow-hidden rounded-lg bg-slate-800 shadow transition hover:shadow-lg">
       <div className="relative aspect-[3/4] bg-slate-700">
@@ -63,6 +65,15 @@ export function ComicCard({ comic }: ComicCardProps) {
           </span>
           <span>{formatRelativeTime(comic.updated_at)}</span>
         </div>
+        {onUpdateChapter && (
+          <button
+            type="button"
+            onClick={() => onUpdateChapter(comic)}
+            className="rounded-md bg-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-600"
+          >
+            Update chapter
+          </button>
+        )}
       </div>
     </article>
   );

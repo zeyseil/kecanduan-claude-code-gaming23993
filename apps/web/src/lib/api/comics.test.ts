@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchComics, postComic } from "./comics";
+import { fetchComics, patchComic, postComic } from "./comics";
 import type { Comic } from "../../types/comic";
 
 const SAMPLE: Comic = {
@@ -101,5 +101,40 @@ describe("postComic", () => {
         cover_url: null,
       }),
     ).rejects.toThrow("title wajib diisi");
+  });
+});
+
+describe("patchComic", () => {
+  it("mengirim PATCH ke /comics/:id dengan body benar dan mengembalikan comic yang diupdate", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ...SAMPLE, latest_chapter: 5 }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await patchComic("1", { latest_chapter: 5 });
+
+    expect(result.latest_chapter).toBe(5);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8787/comics/1",
+      expect.objectContaining({
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ latest_chapter: 5 }),
+      }),
+    );
+  });
+
+  it("throw dengan pesan error dari body saat response gagal", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: () => Promise.resolve({ error: "comic tidak ditemukan" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(patchComic("missing", { latest_chapter: 5 })).rejects.toThrow(
+      "comic tidak ditemukan",
+    );
   });
 });
