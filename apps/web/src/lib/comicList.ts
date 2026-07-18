@@ -24,6 +24,11 @@ function matchesSearch(comic: Comic, query: string): boolean {
   return comic.aliases.some((a) => a.toLowerCase().includes(q));
 }
 
+/** Terbaru diupdate lebih dulu. */
+function sortByRecent(a: Comic, b: Comic): number {
+  return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+}
+
 function bySort(sort: SortKey): (a: Comic, b: Comic) => number {
   switch (sort) {
     case "alpha":
@@ -34,10 +39,13 @@ function bySort(sort: SortKey): (a: Comic, b: Comic) => number {
         a.type_tag.localeCompare(b.type_tag) || a.title.localeCompare(b.title);
     case "recent":
     default:
-      // Terbaru diupdate lebih dulu.
-      return (a, b) =>
-        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      return sortByRecent;
   }
+}
+
+/** Ambil `limit` komik paling baru diupdate/ditambahkan, tanpa memutasi input. */
+export function selectRecent(comics: Comic[], limit: number): Comic[] {
+  return comics.slice().sort(sortByRecent).slice(0, limit);
 }
 
 /**
