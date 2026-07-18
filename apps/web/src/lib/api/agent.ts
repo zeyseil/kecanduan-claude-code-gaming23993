@@ -8,8 +8,22 @@ export interface AgentProcessInput {
   google_api_key: string;
 }
 
-/** Balasan Langflow diteruskan apa adanya (bentuk outputs/session_id version-dependent). */
-export async function processAgentText(input: AgentProcessInput): Promise<unknown> {
+export interface AgentToolCall {
+  name: string;
+  args: Record<string, unknown>;
+  result: Record<string, unknown>;
+}
+
+/**
+ * Balasan dari orkestrasi agent di Worker. Bentuknya ditentukan Worker sendiri
+ * (`src/agent/runAgent.ts`), bukan pihak ketiga — jadi stabil dan bisa diketik.
+ */
+export interface AgentResult {
+  message: string;
+  tool_calls: AgentToolCall[];
+}
+
+export async function processAgentText(input: AgentProcessInput): Promise<AgentResult> {
   const res = await apiFetch(`${BASE_URL}/agent/process`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -18,5 +32,5 @@ export async function processAgentText(input: AgentProcessInput): Promise<unknow
   if (!res.ok) {
     throw new Error(await errorMessage(res));
   }
-  return res.json();
+  return res.json() as Promise<AgentResult>;
 }

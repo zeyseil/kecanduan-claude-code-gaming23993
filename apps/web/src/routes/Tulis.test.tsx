@@ -52,16 +52,12 @@ describe("Tulis", () => {
 
   it("memanggil processAgentText dan menampilkan ringkasan human-readable saat sukses", async () => {
     processAgentTextMock.mockResolvedValue({
-      session_id: "abc",
-      outputs: [
+      message: "Chapter komik Naruto diupdate ke 56.",
+      tool_calls: [
         {
-          outputs: [
-            {
-              outputs: {
-                message: { message: "Chapter komik Naruto diupdate ke 56.", type: "text" },
-              },
-            },
-          ],
+          name: "update_chapter",
+          args: { comic_id: "c-1", chapter: 56 },
+          result: { comic_id: "c-1", updated: true, previous_chapter: 55 },
         },
       ],
     });
@@ -80,11 +76,12 @@ describe("Tulis", () => {
     });
     expect(await screen.findByText(/hasil dari ai agent/i)).toBeInTheDocument();
     expect(screen.getAllByText(/chapter komik naruto diupdate ke 56/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/"session_id": "abc"/)).toBeInTheDocument();
+    expect(screen.getByText(/1 tool dipanggil/i)).toBeInTheDocument();
+    expect(screen.getByText(/"update_chapter"/)).toBeInTheDocument();
   });
 
   it("menampilkan pesan error saat processAgentText gagal", async () => {
-    processAgentTextMock.mockRejectedValue(new Error("Langflow gagal memproses permintaan"));
+    processAgentTextMock.mockRejectedValue(new Error("Gemini menolak permintaan"));
     const user = userEvent.setup();
     render(<Tulis />);
 
@@ -92,6 +89,6 @@ describe("Tulis", () => {
     await user.type(screen.getByLabelText(/editor catatan komik/i), "baru baca naruto ch56");
     await user.click(screen.getByRole("button", { name: /proses dengan ai/i }));
 
-    expect(await screen.findByText(/langflow gagal memproses permintaan/i)).toBeInTheDocument();
+    expect(await screen.findByText(/gemini menolak permintaan/i)).toBeInTheDocument();
   });
 });

@@ -1,6 +1,6 @@
 // Deterministic fuzzy title matching for cari_komik_mirip (TOOL_CONTRACTS.md §2.1).
 // Intentionally NOT reasoning-based — score is computed here in code, the
-// Agent only decides what to do with the score (see LANGFLOW_FLOW.md).
+// agent only decides what to do with the score (see src/agent/systemPrompt.ts).
 
 export function normalizeTitle(title: string): string {
   return title

@@ -45,18 +45,14 @@ wrangler secret put ASTRA_DB_API_ENDPOINT
 wrangler secret put ASTRA_DB_APPLICATION_TOKEN
 wrangler secret put ASTRA_DB_COLLECTION
 wrangler secret put PROCESS_LOG_COLLECTION
-wrangler secret put INTERNAL_TOOLS_SECRET
-wrangler secret put LANGFLOW_API_URL
-wrangler secret put LANGFLOW_API_KEY
-# Opsional — keep-alive ping untuk Langflow di Hugging Face Spaces (lihat
-# langflow/HF_DEPLOY.md). Kosongkan kalau Langflow tidak di HF.
-wrangler secret put LANGFLOW_HEALTH_URL
 ```
 
-Cron trigger `*/30 * * * *` di `wrangler.toml` menjalankan handler `scheduled`
-(src/index.ts) yang nge-ping `LANGFLOW_HEALTH_URL` supaya Space HF tidak tidur.
-Verifikasi lewat `wrangler tail` (log `keep-alive: ... -> 200`). Kalau
-`LANGFLOW_HEALTH_URL` tidak diset, handler no-op.
+Tidak ada secret untuk AI: orkestrasi agent jalan di dalam Worker
+(`src/agent/`) dan memanggil Gemini dengan **API key milik user**, dikirim
+per-request dari client dan tidak pernah disimpan di server.
+
+Opsional: `GEMINI_MODEL` bisa di-set (`wrangler secret put GEMINI_MODEL`, atau
+sebagai plain var) untuk menimpa model default di `src/agent/geminiClient.ts`.
 
 ## Scripts
 

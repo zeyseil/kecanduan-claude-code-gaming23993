@@ -1,142 +1,90 @@
-# TOOL_CONTRACTS.md — Kontrak Endpoint untuk Tool Langflow
+# TOOL_CONTRACTS.md — Kontrak Tool AI Agent
 
-## Keputusan Arsitektur: Tool Diimplementasikan di Worker yang Sama (Hono)
+## Keputusan Arsitektur: Orkestrasi & Tool Hidup di Dalam Worker
 
-Ini menjawab open question terakhir di `SPEC.md` §10. Rekomendasi: **semua endpoint tool di bawah ini hidup di Worker Hono yang sama** dengan `/agent/process` dan `/comics` (bukan backend terpisah). Alasan: konsisten dengan prioritas "minim maintenance" — satu service untuk dirawat, bukan dua; Cloudflare Worker + KV/D1 sudah cukup untuk beban kerja personal ini; menghindari latency tambahan antar-service. Kalau nanti beban kerja berkembang jauh lebih besar, endpoint ini bisa dipisah ke service sendiri tanpa mengubah kontraknya (cuma pindah base URL).
+Agent AI dijalankan **di dalam Cloudflare Worker** (`apps/worker/src/agent/`), memanggil **Gemini function calling** secara langsung. Tidak ada layanan orkestrasi eksternal.
 
-## Autentikasi Internal (beda dari auth user)
+Sebelumnya orkestrasi memakai **Langflow**, dan tool di bawah ini adalah endpoint HTTP `/internal/tools/*` yang dipanggil Langflow lewat jaringan. Itu dihapus karena dua alasan: (1) tidak ada lagi platform hosting gratis yang layak untuk Langflow (empat platform gagal berturut-turut), dan (2) Langflow menyebabkan tujuh bug/gap terpisah, dua di antaranya karena nilai literal (`ai_action`, `status`) hanya diminta lewat teks prompt. Arsitektur Langflow lengkap diarsipkan di branch `archive/langflow-orchestration`.
 
-Endpoint di bawah ini dipanggil oleh **Langflow**, bukan langsung oleh client (Tauri/Capacitor). Jadi butuh lapis auth terpisah dari token user biasa:
+**Konsekuensi utama:** nilai yang dulu rawan salah sekarang dideklarasikan sebagai `enum` di schema fungsi Gemini, jadi ditegakkan oleh API — bukan lagi bergantung pada model mengingat instruksi prompt.
 
-- Header wajib: `X-Internal-Secret: <secret statis>` — disimpan sebagai Worker Secret, dikonfigurasi juga di setiap Tool component Langflow sebagai header tetap (bukan sesuatu yang diisi LLM)
-- Header wajib: `X-User-Id: <user_id>` — nilai ini **fixed/tetap per-run**, diisi lewat `tweaks` saat Worker memanggil `/run` Langflow (sama seperti API key Gemini di SPEC.md §3), BUKAN parameter yang boleh diisi/ditentukan oleh reasoning agent. Ini mencegah agent salah sasaran menulis ke data user lain.
+## Di Mana Kontrak Ini Hidup di Kode
 
-## 1. POST /internal/tools/find-similar
+| Bagian | File |
+|---|---|
+| Deklarasi schema + executor 6 tool | `apps/worker/src/agent/tools.ts` |
+| Aturan keputusan (prompt) | `apps/worker/src/agent/systemPrompt.ts` |
+| Loop tool-calling | `apps/worker/src/agent/runAgent.ts` |
+| Pembungkus REST Gemini | `apps/worker/src/agent/geminiClient.ts` |
 
-Dipanggil pertama sebelum tool manapun lain — implementasi tool `cari_komik_mirip`.
+Schema di `tools.ts` adalah **satu sumber kebenaran** — dokumen ini menjelaskan *kenapa*, bukan mendefinisikan ulang bentuk datanya.
 
-**Request:**
-```json
-{ "candidate_title": "monster" }
-```
+## Autentikasi
 
-**Response:**
-```json
-{
-  "candidates": [
-    { "comic_id": "uuid-1", "title": "Monsters (2022)", "score": 0.91 },
-    { "comic_id": "uuid-2", "title": "Monster Girl Doctor", "score": 0.58 }
-  ]
-}
-```
-- Maks 5 kandidat, urut skor tertinggi
-- Matching: normalisasi (lowercase, hilangkan tanda baca/spasi ganda) + fuzzy string similarity (mis. token-sort ratio), dikerjakan di kode Worker — bukan oleh LLM
+Tool tidak lagi punya lapis auth sendiri: semuanya fungsi in-process, tidak bisa dipanggil dari luar. Yang menjaga pintu masuk hanya `userAuth` (token bearer → `user_id` dari KV) di `/agent/process`. `user_id` diambil dari token itu dan diteruskan ke setiap executor sebagai `ToolContext` — **tidak pernah** menjadi parameter yang boleh diisi model, supaya agent tidak bisa salah sasaran menulis ke data user lain.
 
-**Aturan keputusan (dijalankan di Agent, bukan agent yang menebak sendiri):**
+API key Google milik user dikirim per-request dari client dan dipakai hanya untuk request itu — tidak pernah disimpan di server (SPEC.md §3).
+
+---
+
+## 1. `cari_komik_mirip`
+
+Wajib dipanggil pertama, sebelum tool manapun.
+
+**Args:** `candidate_title` (string, wajib)
+**Hasil:** `{ candidates: [{ comic_id, title, score }] }` — maks 5, urut skor tertinggi.
+
+Matching memakai normalisasi (lowercase, strip tanda baca/spasi ganda) + token-sort Levenshtein di `apps/worker/src/store/fuzzyMatch.ts` — **dihitung di kode, bukan oleh LLM**. Ini prinsip yang tidak boleh diubah tanpa konfirmasi user.
+
+**Aturan keputusan** (di system prompt, agent hanya menerapkan skor — tidak menilai sendiri):
+
 | Kondisi | Aksi |
 |---|---|
-| Skor tertinggi ≥ 0.85 DAN kandidat kedua < skor tertinggi − 0.15 | Cocok tunggal → panggil `update-chapter` |
-| Tidak ada kandidat dengan skor ≥ 0.5 | Tidak ada yang mirip → panggil `create-comic` |
-| Ada 2+ kandidat dengan skor ≥ 0.5 dan selisih antar-skor teratas < 0.15 | Ambigu → JANGAN panggil tool lain, kembalikan opsi ke user |
+| Skor tertinggi ≥ 0.85 DAN selisih ke kandidat kedua ≥ 0.15 | Cocok tunggal → `update_chapter` |
+| Tidak ada kandidat dengan skor ≥ 0.5 | Tidak ada yang mirip → `buat_entry_baru` |
+| Ada 2+ kandidat skor ≥ 0.5 dan selisih antar-skor teratas < 0.15 | Ambigu → JANGAN create/update, kembalikan pilihan ke user |
 
-Angka ambang ini draft awal — perlu disesuaikan setelah ada data pemakaian nyata.
+Angka ambang ini masih draft awal — sesuaikan setelah ada data pemakaian nyata.
 
-## 2. POST /internal/tools/create-comic
+## 2. `buat_entry_baru`
 
-Implementasi tool `buat_entry_baru`.
+**Args:** `title`, `type_tag` (enum: manga/manhwa/manhua), `is_adult` (boolean), `chapter` (number, boleh desimal), `status` (enum: ongoing/completed, opsional)
+**Hasil:** `{ comic_id, created: true }`
 
-**Request:**
-```json
-{
-  "title": "Monsters",
-  "type_tag": "manhwa",
-  "is_adult": false,
-  "chapter": 32,
-  "status": null
-}
-```
-**Response:**
-```json
-{ "comic_id": "uuid-3", "created": true }
-```
-- `type_tag` hanya salah satu dari: `manga`, `manhwa`, `manhua` (lihat SPEC.md §5 — is_adult terpisah, tidak digabung ke sini)
-- `chapter`: number, mendukung desimal (mis. 11.5)
-- `status`: nullable, hanya `"completed"` atau `null` (default ongoing)
+`is_adult` adalah field boolean **terpisah**, tidak pernah digabung ke `type_tag` (pelajaran dari bug aplikasi lama — SPEC.md §8). `status` kosong → default `ongoing`.
 
-## 3. POST /internal/tools/update-chapter
+## 3. `update_chapter`
 
-Implementasi tool `update_chapter`.
+**Args:** `comic_id`, `chapter`, `status` (opsional)
+**Hasil:** `{ comic_id, updated: true, previous_chapter }` — `previous_chapter` dikembalikan supaya balasan ke user bisa bilang "32 → 33", bukan sekadar "berhasil".
 
-**Request:**
-```json
-{ "comic_id": "uuid-1", "chapter": 33, "status": null }
-```
-**Response:**
-```json
-{ "comic_id": "uuid-1", "updated": true, "previous_chapter": 32 }
-```
-- `previous_chapter` dikembalikan supaya Chat Output bisa menampilkan "chapter 32 → 33", bukan cuma "berhasil update"
+## 4. `cari_cover_mangadex`
 
-## 4. POST /internal/tools/fetch-cover
+**Args:** `title`
+**Hasil:** `{ cover_url }` atau `{ cover_url: null }` kalau tidak ditemukan.
 
-Implementasi tool `cari_cover_mangadex`. Hanya dipanggil setelah `create-comic` sukses, tidak dipanggil saat update chapter.
+**Tool ini HANYA mencari, tidak menyimpan.** Gap ini pernah menyebabkan bug nyata: cover ditemukan tapi comic tetap kosong, karena tidak ada yang menuliskannya. Agent wajib memanggil `set_cover` setelahnya (lihat §5).
 
-**Request:**
-```json
-{ "title": "Monsters" }
-```
-**Response:**
-```json
-{ "cover_url": "https://uploads.mangadex.org/covers/.../cover.jpg" }
-```
-atau `{ "cover_url": null }` kalau tidak ditemukan di MangaDex — user melengkapi manual dari halaman visual.
+**Rate limit MangaDex 5 req/detik bersifat per-IP, bukan per-user** — beda dari kuota Gemini yang per-API-key. Karena itu ada throttle token-bucket terpusat lewat Durable Object (`apps/worker/src/durable-objects/RateLimiter.ts`) yang membatasi total panggilan MangaDex dari seluruh Worker; kalau penuh ia mengantre singkat, bukan gagal.
 
-**Rate limit MangaDex: 5 request/detik per alamat IP.** Ini penting karena sifatnya **per-IP, bukan per-user** — beda dari kuota Gemini yang per API-key. Kalau beberapa user memproses barengan dalam detik yang sama, permintaan gabungan ke MangaDex dari Worker bisa saja tembus 5 req/s meski masing-masing user cuma kirim 1 request. Worker WAJIB punya throttle terpusat (token-bucket sederhana, mis. via Durable Object atau counter timestamp di KV) yang membatasi total panggilan ke MangaDex dari seluruh Worker ke ≤5/detik — bukan cuma rate-limit per user_id yang sudah ada di SPEC.md §3. Kalau limit tercapai, antre singkat (beberapa ratus ms) alih-alih langsung gagal.
+## 5. `set_cover`
 
-**Penting — `fetch-cover` HANYA mengembalikan `cover_url`, tidak menyimpannya.** Gap yang ditemukan lewat testing nyata: awalnya tidak ada mekanisme yang menulis hasil `cover_url` ke comic-nya, jadi comic yang dibuat AI selalu tetap `cover_url: null` walau `fetch-cover` sukses menemukan cover. Fix: tool baru `set-cover` (lihat §4b) — Agent WAJIB memanggilnya setelah `fetch-cover` mengembalikan `cover_url` non-null.
+**Args:** `comic_id`, `cover_url`
+**Hasil:** `{ comic_id, updated: true }`, atau `{ error }` kalau comic tidak ditemukan.
 
-## 4b. POST /internal/tools/set-cover
+Dipanggil hanya kalau `cari_cover_mangadex` mengembalikan `cover_url` non-null.
 
-Implementasi tool `set_cover`. Dipanggil setelah `fetch-cover` mengembalikan `cover_url` non-null, untuk menempelkan URL itu ke comic yang baru dibuat (atau comic manapun by `comic_id`). TIDAK dipanggil kalau `fetch-cover` mengembalikan `cover_url: null` (tidak ada yang perlu disimpan — user melengkapi manual dari halaman visual, sesuai §4).
+## 6. `log_proses`
 
-**Request:**
-```json
-{ "comic_id": "uuid-3", "cover_url": "https://uploads.mangadex.org/covers/.../cover.jpg" }
-```
-**Response:**
-```json
-{ "comic_id": "uuid-3", "updated": true }
-```
-- 404 kalau `comic_id` tidak ditemukan
-- `cover_url` wajib diisi (bukan endpoint untuk menghapus cover — pakai `PATCH /comics/:id` biasa dari web app untuk itu)
+**Wajib dipanggil di SEMUA cabang** (created / updated / ambiguous) — audit trail, SPEC.md §9.
 
-## 5. POST /internal/tools/log-process
+**Args:** `input_text`, `ai_action` (enum: created/updated/ambiguous), `target_comic_id` (opsional, kosong saat ambiguous), `confirmed` (boolean)
+**Hasil:** `{ logged: true }`
 
-Implementasi tool `log_proses`. **WAJIB dipanggil di SEMUA cabang** (created / updated / ambiguous) — lihat SPEC.md §9.
+`confirmed`: `true` kalau langsung dieksekusi otomatis, `false` untuk kasus ambigu yang masih menunggu user memilih.
 
-**Request:**
-```json
-{
-  "input_text": "baru baca monster ch33",
-  "ai_action": "updated",
-  "target_comic_id": "uuid-1",
-  "confirmed": true
-}
-```
-**Response:**
-```json
-{ "logged": true }
-```
-- `ai_action`: salah satu dari `created`, `updated`, `ambiguous`
-- `confirmed`: `true` kalau langsung dieksekusi otomatis (skor tinggi tunggal), `false` untuk kasus ambigu yang masih menunggu user memilih — field ini nanti di-update jadi `true`/`false` final setelah user merespons
+---
 
-## Ringkasan Kontrak untuk Konfigurasi Tool Component di Langflow
+## Penanganan Error
 
-| Tool di Langflow | Endpoint | Field yang diisi LLM | Field fixed (tweaks, bukan LLM) |
-|---|---|---|---|
-| cari_komik_mirip | `/internal/tools/find-similar` | candidate_title | X-User-Id, X-Internal-Secret |
-| buat_entry_baru | `/internal/tools/create-comic` | title, type_tag, is_adult, chapter, status | X-User-Id, X-Internal-Secret |
-| update_chapter | `/internal/tools/update-chapter` | comic_id, chapter, status | X-User-Id, X-Internal-Secret |
-| cari_cover_mangadex | `/internal/tools/fetch-cover` | title | X-User-Id, X-Internal-Secret |
-| set_cover | `/internal/tools/set-cover` | comic_id, cover_url | X-User-Id, X-Internal-Secret |
-| log_proses | `/internal/tools/log-process` | input_text, ai_action, target_comic_id, confirmed | X-User-Id, X-Internal-Secret |
+Executor **tidak melempar exception** untuk kegagalan yang wajar (comic tidak ditemukan, arg tidak valid). Mereka mengembalikan `{ error: "..." }`, yang diteruskan ke model sebagai `functionResponse` — sehingga agent bisa menjelaskan masalahnya ke user alih-alih seluruh run mati. Hanya kegagalan Gemini itu sendiri (jaringan/HTTP error) dan `MAX_TURNS` terlampaui yang naik jadi `502` di `/agent/process`.

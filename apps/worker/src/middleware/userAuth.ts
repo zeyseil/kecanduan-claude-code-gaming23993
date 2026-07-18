@@ -2,9 +2,9 @@ import type { MiddlewareHandler } from "hono";
 import type { Env } from "../env";
 
 // Guard for browser-facing routes (/comics, /agent/process): looks up the
-// bearer token against AUTH_TOKENS KV (token -> user_id). Separate from
-// internalAuth.ts, which guards Langflow -> Worker calls with a shared secret
-// instead of a per-user token.
+// bearer token against AUTH_TOKENS KV (token -> user_id). This is the only
+// auth layer now — the shared-secret guard for inbound Langflow calls went
+// away with Langflow itself (agent tools are in-process, see src/agent/).
 export const userAuth: MiddlewareHandler<{ Bindings: Env; Variables: { userId: string } }> =
   async (c, next) => {
     const authHeader = c.req.header("Authorization");
