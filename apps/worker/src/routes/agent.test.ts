@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../env";
-import app from "../index";
+import { app } from "../index";
 
 const fakeTokens = new Map([["test-token", "demo-user"]]);
 

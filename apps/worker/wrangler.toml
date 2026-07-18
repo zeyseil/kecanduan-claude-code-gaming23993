@@ -2,6 +2,11 @@ name = "komik-tracker-worker"
 main = "src/index.ts"
 compatibility_date = "2024-11-01"
 
+# Keep-alive ping so the Langflow Space (Hugging Face free tier sleeps after
+# ~48h idle) stays warm. Handled by the `scheduled` export in src/index.ts.
+[triggers]
+crons = ["*/30 * * * *"]
+
 [[durable_objects.bindings]]
 name = "RATE_LIMITER"
 class_name = "RateLimiter"
