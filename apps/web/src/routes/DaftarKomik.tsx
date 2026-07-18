@@ -5,13 +5,14 @@ import {
   DEFAULT_OPTIONS,
   type ComicListOptions,
 } from "../lib/comicList";
-import { fetchComics, postComic, type NewComicInput } from "../lib/api/comics";
+import { fetchComics, patchComic, postComic, type NewComicInput } from "../lib/api/comics";
 import type { Comic } from "../types/comic";
 import { Toolbar } from "../components/Toolbar";
 import { ComicGrid } from "../components/ComicGrid";
 import { RecentStrip } from "../components/RecentStrip";
 import { SectionHeader } from "../components/SectionHeader";
 import { AddComicForm } from "../components/AddComicForm";
+import { UpdateChapterForm } from "../components/UpdateChapterForm";
 
 const RECENT_LIMIT = 8;
 
@@ -23,6 +24,7 @@ export function DaftarKomik() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [options, setOptions] = useState<ComicListOptions>(DEFAULT_OPTIONS);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingComic, setEditingComic] = useState<Comic | null>(null);
 
   const loadComics = () => {
     setLoadStatus("loading");
@@ -50,6 +52,13 @@ export function DaftarKomik() {
     const created = await postComic(input);
     setComics((prev) => [created, ...prev]);
     setShowAddForm(false);
+  };
+
+  const handleChapterSubmit = async (latestChapter: number) => {
+    if (!editingComic) return;
+    const updated = await patchComic(editingComic.comic_id, { latest_chapter: latestChapter });
+    setComics((prev) => prev.map((c) => (c.comic_id === updated.comic_id ? updated : c)));
+    setEditingComic(null);
   };
 
   return (
@@ -88,7 +97,7 @@ export function DaftarKomik() {
 
           <Toolbar options={options} onChange={setOptions} />
           <SectionHeader title="Semua Komik" count={visible.length} />
-          <ComicGrid comics={visible} />
+          <ComicGrid comics={visible} onUpdateChapter={setEditingComic} />
         </>
       )}
 
@@ -101,6 +110,21 @@ export function DaftarKomik() {
             <AddComicForm
               onSubmit={handleAdd}
               onCancel={() => setShowAddForm(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {editingComic && (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-lg bg-slate-800 p-4">
+            <h2 className="mb-3 text-base font-semibold text-slate-100">
+              Update Chapter — {editingComic.title}
+            </h2>
+            <UpdateChapterForm
+              comic={editingComic}
+              onSubmit={handleChapterSubmit}
+              onCancel={() => setEditingComic(null)}
             />
           </div>
         </div>

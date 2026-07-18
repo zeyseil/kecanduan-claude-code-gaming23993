@@ -11,6 +11,7 @@ vi.mock("../lib/api/comics", async () => {
     ...actual,
     fetchComics: vi.fn(),
     postComic: vi.fn(),
+    patchComic: vi.fn(),
   };
 });
 
@@ -42,10 +43,12 @@ const BERSERK: Comic = {
 
 const fetchComicsMock = vi.mocked(api.fetchComics);
 const postComicMock = vi.mocked(api.postComic);
+const patchComicMock = vi.mocked(api.patchComic);
 
 beforeEach(() => {
   fetchComicsMock.mockReset();
   postComicMock.mockReset();
+  patchComicMock.mockReset();
 });
 
 describe("DaftarKomik", () => {
@@ -81,5 +84,24 @@ describe("DaftarKomik", () => {
 
     await waitFor(() => expect(postComicMock).toHaveBeenCalled());
     await waitFor(() => expect(screen.getAllByText("Berserk").length).toBeGreaterThan(0));
+  });
+
+  it("mengupdate chapter lewat tombol di kartu dan menampilkan angka baru", async () => {
+    const user = userEvent.setup();
+    fetchComicsMock.mockResolvedValue([ONE_PIECE]);
+    patchComicMock.mockResolvedValue({ ...ONE_PIECE, latest_chapter: 1121 });
+    render(<DaftarKomik />);
+
+    await waitFor(() => expect(screen.getAllByText("One Piece").length).toBeGreaterThan(0));
+
+    await user.click(screen.getByRole("button", { name: "Update chapter" }));
+    await user.clear(screen.getByLabelText("Chapter Terakhir Dibaca"));
+    await user.type(screen.getByLabelText("Chapter Terakhir Dibaca"), "1121");
+    await user.click(screen.getByRole("button", { name: "Simpan" }));
+
+    await waitFor(() =>
+      expect(patchComicMock).toHaveBeenCalledWith("1", { latest_chapter: 1121 }),
+    );
+    await waitFor(() => expect(screen.getAllByText(/Ch 1121/).length).toBeGreaterThan(0));
   });
 });

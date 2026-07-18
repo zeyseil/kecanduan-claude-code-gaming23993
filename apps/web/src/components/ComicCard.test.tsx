@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { ComicCard } from "./ComicCard";
 import type { Comic } from "../types/comic";
 
@@ -54,5 +55,23 @@ describe("ComicCard", () => {
   it("menandai komik tamat dengan badge", () => {
     render(<ComicCard comic={comic({ status: "completed" })} />);
     expect(screen.getByText("Tamat")).toBeInTheDocument();
+  });
+
+  it("tidak menampilkan tombol update chapter kalau onUpdateChapter tidak diisi", () => {
+    render(<ComicCard comic={comic()} />);
+    expect(
+      screen.queryByRole("button", { name: "Update chapter" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("memanggil onUpdateChapter dengan comic yang benar saat tombol diklik", async () => {
+    const user = userEvent.setup();
+    const onUpdateChapter = vi.fn();
+    const c = comic({ comic_id: "abc" });
+    render(<ComicCard comic={c} onUpdateChapter={onUpdateChapter} />);
+
+    await user.click(screen.getByRole("button", { name: "Update chapter" }));
+
+    expect(onUpdateChapter).toHaveBeenCalledWith(c);
   });
 });

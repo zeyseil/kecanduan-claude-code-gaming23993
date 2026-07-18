@@ -41,7 +41,16 @@ Slice keempat (branch `feat/add-comic-and-recent-strip`, lanjutan): sambungkan `
 - Total test: `pnpm --filter web test` → 34 hijau (`lib/api/comics.test.ts` baru, `routes/DaftarKomik.test.tsx` baru, `createComic.test.ts` dihapus).
 - Sudah diverifikasi end-to-end: `wrangler dev` (:8787) + `vite dev` (:5173) jalan bareng, tambah komik lewat UI browser tersimpan di Worker (dicek via curl), dan skenario Worker mati menampilkan pesan error yang jelas (bukan crash).
 
-BELUM dibuat: wrapper Tauri & Capacitor, integrasi Langflow/Astra DB nyata, endpoint `/internal/tools/*`, auth token+KV, persistensi (localStorage untuk web kalau backend down, Astra DB untuk worker), `PATCH /comics/:id` belum dipanggil dari UI (endpoint Worker sudah ada, tapi belum ada tombol "update chapter" di frontend).
+Slice kelima (branch `feat/add-comic-and-recent-strip`, lanjutan): tombol "Update chapter" di UI, memanggil `PATCH /comics/:id`. Scope sengaja dibatasi ke field `latest_chapter` saja.
+- `apps/web/src/lib/api/comics.ts`: tambah `patchComic(id, { latest_chapter })` — mirror pola `postComic`/`fetchComics`.
+- `components/ComicCard.tsx`: prop `onUpdateChapter?` (opsional — kalau tidak diisi, tombol disembunyikan; dipakai supaya `RecentStrip` tetap tidak punya tombol update). Tombol "Update chapter" selalu tampil (bukan hover-only) di footer card, supaya nyaman diakses di HP.
+- `components/ComicGrid.tsx`: prop `onUpdateChapter` (wajib) diteruskan ke tiap `ComicCard`.
+- `components/UpdateChapterForm.tsx` (baru): form kecil satu input angka, default value dari chapter saat ini, validasi/error/disable-saat-submit mirror `AddComicForm.tsx`.
+- `routes/DaftarKomik.tsx`: state `editingComic: Comic | null`; modal baru (pola sama seperti modal tambah komik) muncul saat `editingComic` terisi; `handleChapterSubmit` panggil `patchComic()` lalu replace comic yang cocok di state — TIDAK ada optimistic UI.
+- Total test: `pnpm --filter web test` → 44 hijau (`patchComic` di `comics.test.ts`, `ComicCard.test.tsx` tombol, `UpdateChapterForm.test.tsx` baru, alur update di `DaftarKomik.test.tsx`).
+- Sudah diverifikasi end-to-end di browser: tambah komik → klik "Update chapter" → ubah angka → submit → kartu ter-update tanpa reload, tersimpan di Worker (dicek via curl). Skenario Worker mati: modal tetap terbuka dengan pesan error, comic di grid tidak berubah.
+
+BELUM dibuat: wrapper Tauri & Capacitor, integrasi Langflow/Astra DB nyata, endpoint `/internal/tools/*`, auth token+KV, persistensi (localStorage untuk web kalau backend down, Astra DB untuk worker), update field lain selain `latest_chapter` dari UI (title/type_tag/status/cover — endpoint Worker sudah mendukung, tapi belum ada UI-nya).
 
 ## Stack
 - Frontend: React, dibungkus Tauri (desktop) & Capacitor (Android) — satu codebase

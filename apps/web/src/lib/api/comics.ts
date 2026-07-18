@@ -28,6 +28,21 @@ export async function fetchComics(): Promise<Comic[]> {
   return res.json() as Promise<Comic[]>;
 }
 
+export async function patchComic(
+  id: string,
+  patch: { latest_chapter: number },
+): Promise<Comic> {
+  const res = await fetch(`${BASE_URL}/comics/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessage(res));
+  }
+  return res.json() as Promise<Comic>;
+}
+
 export async function postComic(input: NewComicInput): Promise<Comic> {
   // Entry manual selalu berstatus ongoing — lihat aturan lama di createComic.ts.
   const res = await fetch(`${BASE_URL}/comics`, {
