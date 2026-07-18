@@ -20,9 +20,13 @@ new_classes = ["UserRateLimiter"]
 
 # Token -> user_id lookup for browser-facing auth. `id` = production namespace
 # (`wrangler kv namespace create AUTH_TOKENS`), `preview_id` = separate dev
-# namespace (`wrangler kv namespace create AUTH_TOKENS --preview`) required by
-# `wrangler dev --remote` (see apps/worker/README.md "Setup Auth").
+# namespace (`wrangler kv namespace create AUTH_TOKENS --preview`). `remote =
+# true` connects this binding to the real Cloudflare KV during `wrangler dev`
+# (mixed mode) while Durable Objects stay local-simulated — plain `--remote`
+# for the whole Worker is no longer supported once a DO binding is present
+# (see apps/worker/README.md "Setup Auth").
 [[kv_namespaces]]
 binding = "AUTH_TOKENS"
 id = "503fa9ce6c7446f78e50eb8845cbeac5"
 preview_id = "d39de01963b04b3bb1dc271e12697b59"
+remote = true
