@@ -1,0 +1,23 @@
+import type { MiddlewareHandler } from "hono";
+import type { Env } from "../env";
+
+// Guard for browser-facing routes (/comics, /agent/process): looks up the
+// bearer token against AUTH_TOKENS KV (token -> user_id). Separate from
+// internalAuth.ts, which guards Langflow -> Worker calls with a shared secret
+// instead of a per-user token.
+export const userAuth: MiddlewareHandler<{ Bindings: Env; Variables: { userId: string } }> =
+  async (c, next) => {
+    const authHeader = c.req.header("Authorization");
+    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : null;
+    if (!token) {
+      return c.json({ error: "Token tidak ditemukan" }, 401);
+    }
+
+    const userId = await c.env.AUTH_TOKENS.get(token);
+    if (!userId) {
+      return c.json({ error: "Token tidak valid" }, 401);
+    }
+
+    c.set("userId", userId);
+    await next();
+  };

@@ -1,4 +1,5 @@
 import { errorMessage } from "./comics";
+import { apiFetch } from "./client";
 
 const BASE_URL = import.meta.env.VITE_WORKER_URL ?? "http://localhost:8787";
 
@@ -9,7 +10,7 @@ export interface AgentProcessInput {
 
 /** Balasan Langflow diteruskan apa adanya (bentuk outputs/session_id version-dependent). */
 export async function processAgentText(input: AgentProcessInput): Promise<unknown> {
-  const res = await fetch(`${BASE_URL}/agent/process`, {
+  const res = await apiFetch(`${BASE_URL}/agent/process`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),

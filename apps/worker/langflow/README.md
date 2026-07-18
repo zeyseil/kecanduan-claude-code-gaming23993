@@ -27,7 +27,7 @@ Chat Input --> Agent (Google Generative AI, tool calling) --> Chat Output
 ## Tweaks yang dikirim tiap run (dari `agent.ts`)
 
 - `Agent-gemini` → `{ api_key: <google_api_key milik user, per-request, tidak disimpan> }`
-- Tiap `Tool-*` → `{ internal_secret: <INTERNAL_TOOLS_SECRET>, user_id: "demo-user" }`
+- Tiap `Tool-*` → `{ internal_secret: <INTERNAL_TOOLS_SECRET>, app_user_id: "demo-user" }`
 
 **Field `worker_base_url` pada tiap Tool component TIDAK di-tweak** (nilainya sama di semua run) — set sekali secara manual di UI Langflow ke URL publik Worker Anda (mis. `https://komik-tracker-worker.<subdomain>.workers.dev`, atau `http://localhost:8787` untuk testing lokal kalau Langflow Anda bisa menjangkau localhost Worker).
 

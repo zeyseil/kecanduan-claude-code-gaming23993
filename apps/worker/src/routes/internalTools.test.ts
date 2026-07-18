@@ -91,6 +91,7 @@ const testEnv: Env = {
   LANGFLOW_API_URL: "https://fake-langflow/api/v1/run/fake-flow",
   LANGFLOW_API_KEY: "fake-langflow-key",
   RATE_LIMITER: fakeRateLimiterNamespace,
+  AUTH_TOKENS: {} as Env["AUTH_TOKENS"],
 };
 
 const AUTH_HEADERS = {

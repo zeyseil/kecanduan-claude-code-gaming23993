@@ -7,4 +7,5 @@ export interface Env {
   LANGFLOW_API_URL: string;
   LANGFLOW_API_KEY: string;
   RATE_LIMITER: DurableObjectNamespace;
+  AUTH_TOKENS: KVNamespace;
 }

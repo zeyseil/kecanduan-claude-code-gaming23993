@@ -1,9 +1,30 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { processAgentText } from "./agent";
 
+function fakeLocalStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      store.set(key, value);
+    },
+    removeItem: (key: string) => {
+      store.delete(key);
+    },
+    clear: () => store.clear(),
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
+    get length() {
+      return store.size;
+    },
+  } as Storage;
+}
+
 describe("processAgentText", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
+    const storage = fakeLocalStorage();
+    storage.setItem("komik-tracker:auth-token", "test-token");
+    vi.stubGlobal("localStorage", storage);
   });
 
   afterEach(() => {

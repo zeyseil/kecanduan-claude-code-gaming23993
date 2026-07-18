@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { deleteComic, fetchComics, patchComic, postComic } from "./comics";
 import type { Comic } from "../../types/comic";
 
@@ -15,6 +15,30 @@ const SAMPLE: Comic = {
   updated_at: "2026-01-01T00:00:00.000Z",
 };
 
+function fakeLocalStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      store.set(key, value);
+    },
+    removeItem: (key: string) => {
+      store.delete(key);
+    },
+    clear: () => store.clear(),
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
+    get length() {
+      return store.size;
+    },
+  } as Storage;
+}
+
+beforeEach(() => {
+  const storage = fakeLocalStorage();
+  storage.setItem("komik-tracker:auth-token", "test-token");
+  vi.stubGlobal("localStorage", storage);
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -30,7 +54,10 @@ describe("fetchComics", () => {
     const result = await fetchComics();
 
     expect(result).toEqual([SAMPLE]);
-    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8787/comics");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8787/comics",
+      expect.objectContaining({ headers: { Authorization: "Bearer test-token" } }),
+    );
   });
 
   it("throw dengan pesan error dari body saat response gagal", async () => {
@@ -77,7 +104,7 @@ describe("postComic", () => {
       "http://localhost:8787/comics",
       expect.objectContaining({
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: "Bearer test-token" },
       }),
     );
     const [, requestInit] = fetchMock.mock.calls[0];
@@ -119,7 +146,7 @@ describe("patchComic", () => {
       "http://localhost:8787/comics/1",
       expect.objectContaining({
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: "Bearer test-token" },
         body: JSON.stringify({ latest_chapter: 5 }),
       }),
     );

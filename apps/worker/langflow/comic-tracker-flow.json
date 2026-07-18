@@ -66,7 +66,7 @@
               "candidate_title": { "type": "str", "value": "", "display_name": "Judul Kandidat" },
               "worker_base_url": { "type": "str", "value": "http://localhost:8787", "display_name": "Worker Base URL", "advanced": true },
               "internal_secret": { "type": "str", "value": "", "display_name": "Internal Secret", "advanced": true },
-              "user_id": { "type": "str", "value": "demo-user", "display_name": "User Id", "advanced": true }
+              "app_user_id": { "type": "str", "value": "demo-user", "display_name": "App User Id", "advanced": true }
             }
           }
         }
@@ -91,7 +91,7 @@
               "status": { "type": "str", "value": "", "display_name": "Status (completed atau kosong)", "advanced": true },
               "worker_base_url": { "type": "str", "value": "http://localhost:8787", "display_name": "Worker Base URL", "advanced": true },
               "internal_secret": { "type": "str", "value": "", "display_name": "Internal Secret", "advanced": true },
-              "user_id": { "type": "str", "value": "demo-user", "display_name": "User Id", "advanced": true }
+              "app_user_id": { "type": "str", "value": "demo-user", "display_name": "App User Id", "advanced": true }
             }
           }
         }
@@ -114,7 +114,7 @@
               "status": { "type": "str", "value": "", "display_name": "Status (completed atau kosong)", "advanced": true },
               "worker_base_url": { "type": "str", "value": "http://localhost:8787", "display_name": "Worker Base URL", "advanced": true },
               "internal_secret": { "type": "str", "value": "", "display_name": "Internal Secret", "advanced": true },
-              "user_id": { "type": "str", "value": "demo-user", "display_name": "User Id", "advanced": true }
+              "app_user_id": { "type": "str", "value": "demo-user", "display_name": "App User Id", "advanced": true }
             }
           }
         }
@@ -135,7 +135,7 @@
               "title": { "type": "str", "value": "", "display_name": "Judul" },
               "worker_base_url": { "type": "str", "value": "http://localhost:8787", "display_name": "Worker Base URL", "advanced": true },
               "internal_secret": { "type": "str", "value": "", "display_name": "Internal Secret", "advanced": true },
-              "user_id": { "type": "str", "value": "demo-user", "display_name": "User Id", "advanced": true }
+              "app_user_id": { "type": "str", "value": "demo-user", "display_name": "App User Id", "advanced": true }
             }
           }
         }
@@ -159,7 +159,7 @@
               "confirmed": { "type": "bool", "value": false, "display_name": "Confirmed" },
               "worker_base_url": { "type": "str", "value": "http://localhost:8787", "display_name": "Worker Base URL", "advanced": true },
               "internal_secret": { "type": "str", "value": "", "display_name": "Internal Secret", "advanced": true },
-              "user_id": { "type": "str", "value": "demo-user", "display_name": "User Id", "advanced": true }
+              "app_user_id": { "type": "str", "value": "demo-user", "display_name": "App User Id", "advanced": true }
             }
           }
         }

@@ -1,17 +1,15 @@
 import { Hono } from "hono";
 import type { Env } from "../env";
-
-// Auth is deferred — every request acts on this fixed demo user (mirrors
-// routes/comics.ts). X-User-Id sent to internal tools must match this so the
-// Agent's tool calls hit the same partition as the browser-facing routes.
-const DEMO_USER_ID = "demo-user";
+import { userAuth } from "../middleware/userAuth";
 
 interface AgentProcessBody {
   teks_input?: unknown;
   google_api_key?: unknown;
 }
 
-export const agent = new Hono<{ Bindings: Env }>();
+export const agent = new Hono<{ Bindings: Env; Variables: { userId: string } }>();
+
+agent.use("/process", userAuth);
 
 // Component ids referenced here must match the actual node ids in the user's
 // Langflow flow ("komik-tracker" project, flow "yay") — they're how `tweaks`
@@ -47,7 +45,7 @@ agent.post("/process", async (c) => {
       // Field name is "app_user_id", not "user_id" — Langflow silently
       // overrides any field literally named "user_id" with its own platform
       // user id, ignoring both default value and tweaks. See langflow/README.md.
-      app_user_id: DEMO_USER_ID,
+      app_user_id: c.get("userId"),
     };
   }
 
