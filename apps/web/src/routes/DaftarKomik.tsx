@@ -1,12 +1,11 @@
-import { useMemo, useState } from "react";
-import { MOCK_COMICS } from "../mocks/comics";
+import { useEffect, useMemo, useState } from "react";
 import {
   selectComics,
   selectRecent,
   DEFAULT_OPTIONS,
   type ComicListOptions,
 } from "../lib/comicList";
-import { createComic, type NewComicInput } from "../lib/createComic";
+import { fetchComics, postComic, type NewComicInput } from "../lib/api/comics";
 import type { Comic } from "../types/comic";
 import { Toolbar } from "../components/Toolbar";
 import { ComicGrid } from "../components/ComicGrid";
@@ -16,17 +15,40 @@ import { AddComicForm } from "../components/AddComicForm";
 
 const RECENT_LIMIT = 8;
 
+type LoadStatus = "loading" | "ready" | "error";
+
 export function DaftarKomik() {
-  const [comics, setComics] = useState<Comic[]>(MOCK_COMICS);
+  const [comics, setComics] = useState<Comic[]>([]);
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>("loading");
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [options, setOptions] = useState<ComicListOptions>(DEFAULT_OPTIONS);
   const [showAddForm, setShowAddForm] = useState(false);
+
+  const loadComics = () => {
+    setLoadStatus("loading");
+    setLoadError(null);
+    fetchComics()
+      .then((result) => {
+        setComics(result);
+        setLoadStatus("ready");
+      })
+      .catch((err: unknown) => {
+        setLoadError(err instanceof Error ? err.message : "Gagal memuat komik.");
+        setLoadStatus("error");
+      });
+  };
+
+  useEffect(() => {
+    loadComics();
+  }, []);
 
   const visible = useMemo(() => selectComics(comics, options), [comics, options]);
   const recent = useMemo(() => selectRecent(comics, RECENT_LIMIT), [comics]);
   const isSearching = options.search.trim() !== "";
 
-  const handleAdd = (input: NewComicInput) => {
-    setComics((prev) => [createComic(input), ...prev]);
+  const handleAdd = async (input: NewComicInput) => {
+    const created = await postComic(input);
+    setComics((prev) => [created, ...prev]);
     setShowAddForm(false);
   };
 
@@ -43,11 +65,32 @@ export function DaftarKomik() {
         </button>
       </div>
 
-      {!isSearching && <RecentStrip comics={recent} />}
+      {loadStatus === "loading" && (
+        <p className="py-8 text-center text-sm text-slate-400">Memuat komik…</p>
+      )}
 
-      <Toolbar options={options} onChange={setOptions} />
-      <SectionHeader title="Semua Komik" count={visible.length} />
-      <ComicGrid comics={visible} />
+      {loadStatus === "error" && (
+        <div className="flex flex-col items-center gap-2 py-8 text-center">
+          <p className="text-sm text-rose-400">{loadError}</p>
+          <button
+            type="button"
+            onClick={loadComics}
+            className="rounded-md bg-slate-700 px-3 py-1.5 text-sm text-slate-100 hover:bg-slate-600"
+          >
+            Coba lagi
+          </button>
+        </div>
+      )}
+
+      {loadStatus === "ready" && (
+        <>
+          {!isSearching && <RecentStrip comics={recent} />}
+
+          <Toolbar options={options} onChange={setOptions} />
+          <SectionHeader title="Semua Komik" count={visible.length} />
+          <ComicGrid comics={visible} />
+        </>
+      )}
 
       {showAddForm && (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 p-4">
