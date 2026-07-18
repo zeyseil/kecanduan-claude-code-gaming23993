@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "create-collection": "tsx scripts/create-collection.ts"
+    "create-collection": "tsx scripts/create-collection.ts",
+    "migrate-cover-index": "tsx scripts/migrate-cover-index.ts"
   },
   "dependencies": {
     "@datastax/astra-db-ts": "^2.3.0",

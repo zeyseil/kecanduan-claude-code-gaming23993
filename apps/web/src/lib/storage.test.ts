@@ -1,0 +1,48 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getGoogleApiKey, setGoogleApiKey } from "./storage";
+
+// jsdom's built-in localStorage is unreliable under some Node versions in
+// this environment, so we stub it ourselves (same pattern as fetch mocking
+// elsewhere) rather than depend on the real browser implementation.
+function fakeLocalStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      store.set(key, value);
+    },
+    removeItem: (key: string) => {
+      store.delete(key);
+    },
+    clear: () => store.clear(),
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
+    get length() {
+      return store.size;
+    },
+  } as Storage;
+}
+
+describe("google api key storage", () => {
+  beforeEach(() => {
+    vi.stubGlobal("localStorage", fakeLocalStorage());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns empty string when nothing stored", () => {
+    expect(getGoogleApiKey()).toBe("");
+  });
+
+  it("persists and reads back a value", () => {
+    setGoogleApiKey("AIzaSomeKey");
+    expect(getGoogleApiKey()).toBe("AIzaSomeKey");
+  });
+
+  it("clears storage when set to empty string", () => {
+    setGoogleApiKey("AIzaSomeKey");
+    setGoogleApiKey("");
+    expect(getGoogleApiKey()).toBe("");
+  });
+});

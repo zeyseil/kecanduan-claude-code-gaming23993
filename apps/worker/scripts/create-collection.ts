@@ -24,6 +24,7 @@ function loadDevVars(): Record<string, string> {
 async function ensureCollection(
   db: ReturnType<DataAPIClient["db"]>,
   collectionName: string,
+  options?: Parameters<ReturnType<DataAPIClient["db"]>["createCollection"]>[1],
 ): Promise<void> {
   const existing = await db.listCollections();
   if (existing.some((c) => c.name === collectionName)) {
@@ -31,7 +32,7 @@ async function ensureCollection(
     return;
   }
 
-  await db.createCollection(collectionName);
+  await db.createCollection(collectionName, options);
   console.log(`Collection "${collectionName}" berhasil dibuat.`);
 }
 
@@ -51,7 +52,9 @@ async function main() {
   const client = new DataAPIClient(token);
   const db = client.db(endpoint);
 
-  await ensureCollection(db, comicsCollection);
+  // cover_url berisi base64 gambar yang bisa besar — field yang di-index Astra
+  // punya limit ketat (8000 byte), jadi dikecualikan dari indexing sejak awal.
+  await ensureCollection(db, comicsCollection, { indexing: { deny: ["cover_url"] } });
   await ensureCollection(db, processLogCollection);
 }
 

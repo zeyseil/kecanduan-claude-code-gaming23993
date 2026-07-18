@@ -31,3 +31,6 @@ coverage/
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
+
+# backup file dari script migrasi Astra (berisi data user nyata)
+apps/worker/backup-*.json
