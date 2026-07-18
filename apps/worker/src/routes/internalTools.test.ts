@@ -91,6 +91,7 @@ const testEnv: Env = {
   LANGFLOW_API_URL: "https://fake-langflow/api/v1/run/fake-flow",
   LANGFLOW_API_KEY: "fake-langflow-key",
   RATE_LIMITER: fakeRateLimiterNamespace,
+  USER_RATE_LIMITER: fakeRateLimiterNamespace as unknown as Env["USER_RATE_LIMITER"],
   AUTH_TOKENS: {} as Env["AUTH_TOKENS"],
 };
 
@@ -227,26 +228,24 @@ describe("/internal/tools", () => {
   });
 
   describe("POST /fetch-cover", () => {
-    it("returns a cover_url when MangaDex finds a match", async () => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn(async () =>
-          new Response(
-            JSON.stringify({
-              data: [
-                {
-                  id: "manga-1",
-                  relationships: [
-                    { type: "author" },
-                    { type: "cover_art", attributes: { fileName: "cover.jpg" } },
-                  ],
-                },
-              ],
-            }),
-            { status: 200 },
-          ),
+    it("returns a cover_url when MangaDex finds a match, sending an identifying User-Agent", async () => {
+      const fetchMock = vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: "manga-1",
+                relationships: [
+                  { type: "author" },
+                  { type: "cover_art", attributes: { fileName: "cover.jpg" } },
+                ],
+              },
+            ],
+          }),
+          { status: 200 },
         ),
       );
+      vi.stubGlobal("fetch", fetchMock);
 
       const res = await request("/fetch-cover", {
         method: "POST",
@@ -256,6 +255,10 @@ describe("/internal/tools", () => {
       expect(res.status).toBe(200);
       const body = (await res.json()) as { cover_url: string | null };
       expect(body.cover_url).toBe("https://uploads.mangadex.org/covers/manga-1/cover.jpg");
+
+      const [, requestInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+      const headers = new Headers(requestInit.headers);
+      expect(headers.get("User-Agent")).toBeTruthy();
     });
 
     it("returns cover_url null when MangaDex has no match", async () => {

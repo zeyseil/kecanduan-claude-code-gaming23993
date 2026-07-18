@@ -6,9 +6,17 @@ compatibility_date = "2024-11-01"
 name = "RATE_LIMITER"
 class_name = "RateLimiter"
 
+[[durable_objects.bindings]]
+name = "USER_RATE_LIMITER"
+class_name = "UserRateLimiter"
+
 [[migrations]]
 tag = "v1"
 new_classes = ["RateLimiter"]
+
+[[migrations]]
+tag = "v2"
+new_classes = ["UserRateLimiter"]
 
 # Token -> user_id lookup for browser-facing auth. `id` = production namespace
 # (`wrangler kv namespace create AUTH_TOKENS`), `preview_id` = separate dev

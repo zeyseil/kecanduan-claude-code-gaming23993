@@ -21,3 +21,4 @@ export default app;
 // Durable Object class must be exported from the entry module for wrangler
 // to bind it (see wrangler.toml [[durable_objects.bindings]]).
 export { RateLimiter } from "./durable-objects/RateLimiter";
+export { UserRateLimiter } from "./durable-objects/UserRateLimiter";

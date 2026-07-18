@@ -76,11 +76,17 @@ const { default: app } = await import("../index");
 
 const fakeTokens = new Map([["test-token", "demo-user"]]);
 
+const fakeUserRateLimiterNamespace = {
+  idFromName: (name: string) => name,
+  get: () => ({ fetch: async () => new Response("ok", { status: 200 }) }),
+};
+
 const testEnv = {
   ASTRA_DB_API_ENDPOINT: "https://fake.apps.astra.datastax.com",
   ASTRA_DB_APPLICATION_TOKEN: "fake-token",
   ASTRA_DB_COLLECTION: "comics",
   AUTH_TOKENS: { get: async (key: string) => fakeTokens.get(key) ?? null },
+  USER_RATE_LIMITER: fakeUserRateLimiterNamespace,
 };
 
 function request(input: string, init?: RequestInit) {
@@ -244,5 +250,21 @@ describe("/comics", () => {
     expect(patchRes.status).toBe(500);
     const body = (await patchRes.json()) as { error: string };
     expect(body.error).toContain("Gagal menyimpan komik");
+  });
+
+  it("returns 429 when the user rate limiter rejects the request", async () => {
+    const limitedEnv = {
+      ...testEnv,
+      USER_RATE_LIMITER: {
+        idFromName: (name: string) => name,
+        get: () => ({ fetch: async () => new Response("rate limited", { status: 429 }) }),
+      },
+    };
+    const res = await app.request(
+      "/comics",
+      { headers: { Authorization: "Bearer test-token" } },
+      limitedEnv,
+    );
+    expect(res.status).toBe(429);
   });
 });

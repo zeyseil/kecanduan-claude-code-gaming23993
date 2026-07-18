@@ -13,6 +13,10 @@ const testEnv: Env = {
   LANGFLOW_API_URL: "https://fake-langflow/api/v1/run/fake-flow",
   LANGFLOW_API_KEY: "fake-langflow-key",
   RATE_LIMITER: {} as Env["RATE_LIMITER"],
+  USER_RATE_LIMITER: {
+    idFromName: (name: string) => name,
+    get: () => ({ fetch: async () => new Response("ok", { status: 200 }) }),
+  } as unknown as Env["USER_RATE_LIMITER"],
   AUTH_TOKENS: {
     get: async (key: string) => fakeTokens.get(key) ?? null,
   } as Env["AUTH_TOKENS"],
@@ -93,5 +97,25 @@ describe("/agent/process", () => {
 
     const res = await request({ teks_input: "test", google_api_key: "dummy" });
     expect(res.status).toBe(502);
+  });
+
+  it("returns 429 when the user rate limiter rejects the request", async () => {
+    const limitedEnv: Env = {
+      ...testEnv,
+      USER_RATE_LIMITER: {
+        idFromName: (name: string) => name,
+        get: () => ({ fetch: async () => new Response("rate limited", { status: 429 }) }),
+      } as unknown as Env["USER_RATE_LIMITER"],
+    };
+    const res = await app.request(
+      "/agent/process",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer test-token" },
+        body: JSON.stringify({ teks_input: "test", google_api_key: "dummy" }),
+      },
+      limitedEnv,
+    );
+    expect(res.status).toBe(429);
   });
 });

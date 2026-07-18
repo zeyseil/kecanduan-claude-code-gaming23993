@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Env } from "../env";
 import { userAuth } from "../middleware/userAuth";
+import { rateLimit } from "../middleware/rateLimit";
 
 interface AgentProcessBody {
   teks_input?: unknown;
@@ -9,7 +10,7 @@ interface AgentProcessBody {
 
 export const agent = new Hono<{ Bindings: Env; Variables: { userId: string } }>();
 
-agent.use("/process", userAuth);
+agent.use("/process", userAuth, rateLimit);
 
 // Component ids referenced here must match the actual node ids in the user's
 // Langflow flow ("komik-tracker" project, flow "yay") — they're how `tweaks`
