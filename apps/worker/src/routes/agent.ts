@@ -17,6 +17,13 @@ agent.use("/process", userAuth, rateLimit);
 // targets specific nodes. Langflow assigns a random suffix per node, so these
 // are NOT stable across a from-scratch rebuild; update here if the flow is
 // ever rebuilt. See langflow/README.md.
+//
+// "CustomComponent-REPLACE-ME-set-cover" is a PLACEHOLDER for set_cover — this
+// tool didn't exist yet when the other 5 ids were captured from the live
+// flow. It must be added manually as a new Custom Component node in Langflow
+// (see langflow/README.md), and this constant updated with the real id
+// Langflow assigns once that node is created — otherwise the internal_secret/
+// app_user_id tweaks for it silently won't apply.
 const AGENT_COMPONENT_ID = "Agent-UVDzm";
 const TOOL_COMPONENT_IDS = [
   "CustomComponent-zI7yQ", // cari_komik_mirip
@@ -24,6 +31,7 @@ const TOOL_COMPONENT_IDS = [
   "CustomComponent-Dn6gI", // update_chapter
   "CustomComponent-TiPBs", // cari_cover_mangadex
   "CustomComponent-XuCo4", // log_proses
+  "CustomComponent-REPLACE-ME-set-cover", // set_cover — PLACEHOLDER, see comment above
 ] as const;
 
 agent.post("/process", async (c) => {

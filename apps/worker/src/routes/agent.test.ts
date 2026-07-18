@@ -83,6 +83,10 @@ describe("/agent/process", () => {
       internal_secret: "test-secret",
       app_user_id: "demo-user",
     });
+    expect(sentBody.tweaks["CustomComponent-REPLACE-ME-set-cover"]).toEqual({
+      internal_secret: "test-secret",
+      app_user_id: "demo-user",
+    });
   });
 
   it("returns 502 when Langflow responds with an error status", async () => {

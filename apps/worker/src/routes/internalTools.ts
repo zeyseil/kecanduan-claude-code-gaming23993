@@ -160,6 +160,42 @@ internalTools.post("/fetch-cover", async (c) => {
   return c.json({ cover_url });
 });
 
+// --- set-cover (set_cover) ---------------------------------------------------
+
+interface SetCoverBody {
+  comic_id?: unknown;
+  cover_url?: unknown;
+}
+
+function validateSetCoverBody(body: SetCoverBody): string | null {
+  if (typeof body.comic_id !== "string" || body.comic_id.trim() === "") {
+    return "comic_id wajib diisi";
+  }
+  if (typeof body.cover_url !== "string" || body.cover_url.trim() === "") {
+    return "cover_url wajib diisi";
+  }
+  return null;
+}
+
+internalTools.post("/set-cover", async (c) => {
+  const body = await c.req.json<SetCoverBody>().catch(() => ({}) as SetCoverBody);
+  const error = validateSetCoverBody(body);
+  if (error) {
+    return c.json({ error }, 400);
+  }
+
+  const store = getComicStore(c.env);
+  const userId = c.get("userId");
+  const comicId = body.comic_id as string;
+
+  if (!(await store.findComic(userId, comicId))) {
+    return c.json({ error: "comic tidak ditemukan" }, 404);
+  }
+
+  await store.updateComic(userId, comicId, { cover_url: body.cover_url as string });
+  return c.json({ comic_id: comicId, updated: true });
+});
+
 // --- log-process (log_proses) -------------------------------------------------
 
 interface LogProcessBody {
