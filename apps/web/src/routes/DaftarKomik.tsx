@@ -20,6 +20,7 @@ import { RecentStrip } from "../components/RecentStrip";
 import { SectionHeader } from "../components/SectionHeader";
 import { AddComicForm } from "../components/AddComicForm";
 import { EditComicForm } from "../components/EditComicForm";
+import { SearchPalette } from "../components/SearchPalette";
 
 const RECENT_LIMIT = 8;
 
@@ -33,6 +34,18 @@ export function DaftarKomik() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingComic, setEditingComic] = useState<Comic | null>(null);
   const [pressedComicId, setPressedComicId] = useState<string | null>(null);
+  const [showSearchPalette, setShowSearchPalette] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setShowSearchPalette(true);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const loadComics = () => {
     setLoadStatus("loading");
@@ -119,7 +132,11 @@ export function DaftarKomik() {
         <>
           {!isSearching && <RecentStrip comics={recent} />}
 
-          <Toolbar options={options} onChange={setOptions} />
+          <Toolbar
+            options={options}
+            onChange={setOptions}
+            onOpenSearch={() => setShowSearchPalette(true)}
+          />
           <SectionHeader title="Semua Komik" count={visible.length} />
           <ComicGrid
             comics={visible}
@@ -142,6 +159,17 @@ export function DaftarKomik() {
             />
           </div>
         </div>
+      )}
+
+      {showSearchPalette && (
+        <SearchPalette
+          comics={comics}
+          onSelect={(comic) => {
+            setShowSearchPalette(false);
+            handleEditOpen(comic);
+          }}
+          onClose={() => setShowSearchPalette(false)}
+        />
       )}
 
       {editingComic && (

@@ -22,9 +22,10 @@ const STATUS_LABEL: Record<Status, string> = {
 interface ToolbarProps {
   options: ComicListOptions;
   onChange: (next: ComicListOptions) => void;
+  onOpenSearch: () => void;
 }
 
-export function Toolbar({ options, onChange }: ToolbarProps) {
+export function Toolbar({ options, onChange, onOpenSearch }: ToolbarProps) {
   const set = <K extends keyof ComicListOptions>(
     key: K,
     value: ComicListOptions[K],
@@ -32,14 +33,16 @@ export function Toolbar({ options, onChange }: ToolbarProps) {
 
   return (
     <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-      <input
-        type="search"
-        aria-label="Cari judul komik"
-        placeholder="Cari judul…"
-        value={options.search}
-        onChange={(e) => set("search", e.target.value)}
-        className="flex-1 rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none sm:min-w-[200px]"
-      />
+      <button
+        type="button"
+        onClick={onOpenSearch}
+        className="flex items-center justify-between gap-2 rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-400 hover:border-indigo-500 hover:text-slate-200 sm:min-w-[200px]"
+      >
+        <span>Cari judul…</span>
+        <kbd className="rounded border border-slate-600 px-1.5 py-0.5 text-[10px] text-slate-500">
+          Ctrl K
+        </kbd>
+      </button>
 
       <select
         aria-label="Urutkan"

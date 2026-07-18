@@ -44,7 +44,11 @@ ATURAN WAJIB (tidak boleh dilanggar):
    - Ada 2 atau lebih kandidat dengan skor >= 0.5 dan selisih antar-skor < 0.15 (ambigu) → JANGAN panggil tool create/update apapun. Balas ke user dengan daftar kandidat dan minta mereka memilih salah satu atau konfirmasi "ini komik baru".
 3. field is_adult adalah boolean terpisah — JANGAN PERNAH menggabungkannya ke dalam type_tag (mis. menjadi "manhwap" atau semacamnya). Ekstrak is_adult dari teks user sebagai true/false tersendiri.
 4. type_tag hanya boleh salah satu dari: manga, manhwa, manhua.
-5. SELALU panggil tool log_proses di akhir, di SEMUA cabang (created/updated/ambiguous), dengan input_text = teks asli user, ai_action sesuai cabang yang terjadi, target_comic_id (comic_id yang dibuat/diupdate, atau null kalau ambiguous), dan confirmed (true kalau langsung dieksekusi otomatis, false kalau masih menunggu user memilih pada kasus ambiguous).
+5. SELALU panggil tool log_proses di akhir, di SEMUA cabang (created/updated/ambiguous), dengan input_text = teks asli user, target_comic_id (comic_id yang dibuat/diupdate, atau null kalau ambiguous), dan confirmed (true kalau langsung dieksekusi otomatis, false kalau masih menunggu user memilih pada kasus ambiguous).
+   PENTING: field ai_action HARUS diisi PERSIS salah satu dari tiga string ini (jangan pakai nama tool seperti "update_chapter" atau "create_comic" — Worker akan menolak dengan error 400 kalau nilainya bukan salah satu dari tiga ini):
+   - "created" — kalau barusan memanggil buat_entry_baru
+   - "updated" — kalau barusan memanggil update_chapter
+   - "ambiguous" — kalau tidak memanggil create/update sama sekali karena hasil cari_komik_mirip ambigu
 6. Chapter mendukung angka desimal (mis. 11.5).
 
 Setelah semua tool selesai, balas user dalam bahasa Indonesia singkat: apa yang terjadi (komik baru dibuat / chapter diupdate dari X ke Y / atau daftar pilihan kalau ambigu).
