@@ -1,3 +1,11 @@
 name = "komik-tracker-worker"
 main = "src/index.ts"
 compatibility_date = "2024-11-01"
+
+[[durable_objects.bindings]]
+name = "RATE_LIMITER"
+class_name = "RateLimiter"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RateLimiter"]

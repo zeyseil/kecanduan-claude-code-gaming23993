@@ -2,6 +2,7 @@ import type { Env } from "../env";
 import type { Comic } from "../types/comic";
 import type { ComicRepository } from "./comicRepository";
 import { getCollection } from "./astraClient";
+import { rankCandidates } from "./fuzzyMatch";
 
 function toComic(doc: Comic & { user_id: string; _id?: unknown }): Comic {
   const comic = { ...doc };
@@ -41,6 +42,11 @@ export function createAstraComicRepository(env: Env): ComicRepository {
     async deleteComic(userId, comicId) {
       const result = await collection.deleteOne({ user_id: userId, comic_id: comicId });
       return result.deletedCount > 0;
+    },
+
+    async searchComics(userId, candidateTitle) {
+      const docs = await collection.find({ user_id: userId }).toArray();
+      return rankCandidates(docs.map(toComic), candidateTitle);
     },
   };
 }

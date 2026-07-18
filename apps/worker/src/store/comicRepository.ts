@@ -1,4 +1,5 @@
 import type { Comic } from "../types/comic";
+import type { SimilarityCandidate } from "./fuzzyMatch";
 
 export interface ComicRepository {
   listComics(userId: string): Promise<Comic[]>;
@@ -10,4 +11,5 @@ export interface ComicRepository {
     patch: Partial<Omit<Comic, "comic_id" | "created_at">>,
   ): Promise<Comic | undefined>;
   deleteComic(userId: string, comicId: string): Promise<boolean>;
+  searchComics(userId: string, candidateTitle: string): Promise<SimilarityCandidate[]>;
 }
