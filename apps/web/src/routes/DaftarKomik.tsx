@@ -5,14 +5,21 @@ import {
   DEFAULT_OPTIONS,
   type ComicListOptions,
 } from "../lib/comicList";
-import { fetchComics, patchComic, postComic, type NewComicInput } from "../lib/api/comics";
+import {
+  deleteComic,
+  fetchComics,
+  patchComic,
+  postComic,
+  type ComicPatch,
+  type NewComicInput,
+} from "../lib/api/comics";
 import type { Comic } from "../types/comic";
 import { Toolbar } from "../components/Toolbar";
 import { ComicGrid } from "../components/ComicGrid";
 import { RecentStrip } from "../components/RecentStrip";
 import { SectionHeader } from "../components/SectionHeader";
 import { AddComicForm } from "../components/AddComicForm";
-import { UpdateChapterForm } from "../components/UpdateChapterForm";
+import { EditComicForm } from "../components/EditComicForm";
 
 const RECENT_LIMIT = 8;
 
@@ -25,6 +32,7 @@ export function DaftarKomik() {
   const [options, setOptions] = useState<ComicListOptions>(DEFAULT_OPTIONS);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingComic, setEditingComic] = useState<Comic | null>(null);
+  const [pressedComicId, setPressedComicId] = useState<string | null>(null);
 
   const loadComics = () => {
     setLoadStatus("loading");
@@ -54,10 +62,26 @@ export function DaftarKomik() {
     setShowAddForm(false);
   };
 
-  const handleChapterSubmit = async (latestChapter: number) => {
+  const handlePress = (comicId: string) => {
+    setPressedComicId((prev) => (prev === comicId ? null : comicId));
+  };
+
+  const handleEditOpen = (comic: Comic) => {
+    setEditingComic(comic);
+    setPressedComicId(null);
+  };
+
+  const handleEditSubmit = async (patch: ComicPatch) => {
     if (!editingComic) return;
-    const updated = await patchComic(editingComic.comic_id, { latest_chapter: latestChapter });
+    const updated = await patchComic(editingComic.comic_id, patch);
     setComics((prev) => prev.map((c) => (c.comic_id === updated.comic_id ? updated : c)));
+    setEditingComic(null);
+  };
+
+  const handleDelete = async () => {
+    if (!editingComic) return;
+    await deleteComic(editingComic.comic_id);
+    setComics((prev) => prev.filter((c) => c.comic_id !== editingComic.comic_id));
     setEditingComic(null);
   };
 
@@ -97,7 +121,12 @@ export function DaftarKomik() {
 
           <Toolbar options={options} onChange={setOptions} />
           <SectionHeader title="Semua Komik" count={visible.length} />
-          <ComicGrid comics={visible} onUpdateChapter={setEditingComic} />
+          <ComicGrid
+            comics={visible}
+            pressedComicId={pressedComicId}
+            onPress={handlePress}
+            onEdit={handleEditOpen}
+          />
         </>
       )}
 
@@ -119,11 +148,12 @@ export function DaftarKomik() {
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-md rounded-lg bg-slate-800 p-4">
             <h2 className="mb-3 text-base font-semibold text-slate-100">
-              Update Chapter — {editingComic.title}
+              Edit Komik — {editingComic.title}
             </h2>
-            <UpdateChapterForm
+            <EditComicForm
               comic={editingComic}
-              onSubmit={handleChapterSubmit}
+              onSubmit={handleEditSubmit}
+              onDelete={handleDelete}
               onCancel={() => setEditingComic(null)}
             />
           </div>

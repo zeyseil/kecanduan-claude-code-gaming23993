@@ -37,5 +37,10 @@ export function createAstraComicRepository(env: Env): ComicRepository {
       );
       return result ? toComic(result) : undefined;
     },
+
+    async deleteComic(userId, comicId) {
+      const result = await collection.deleteOne({ user_id: userId, comic_id: comicId });
+      return result.deletedCount > 0;
+    },
   };
 }

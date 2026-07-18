@@ -39,6 +39,15 @@ vi.mock("@datastax/astra-db-ts", () => {
       Object.assign(doc, update.$set);
       return doc;
     }
+
+    async deleteOne(filter: { user_id: string; comic_id: string }) {
+      const index = documents.findIndex(
+        (d) => d.user_id === filter.user_id && d.comic_id === filter.comic_id,
+      );
+      if (index === -1) return { deletedCount: 0 };
+      documents.splice(index, 1);
+      return { deletedCount: 1 };
+    }
   }
 
   class FakeDb {
@@ -144,5 +153,32 @@ describe("/comics", () => {
     expect(patched.latest_chapter).toBe(365);
     expect(patched.status).toBe("completed");
     expect(patched.is_adult).toBe(true);
+  });
+
+  it("returns 404 when deleting a missing comic", async () => {
+    const res = await request("/comics/missing-id", { method: "DELETE" });
+    expect(res.status).toBe(404);
+  });
+
+  it("deletes an existing comic", async () => {
+    const createRes = await request("/comics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Vagabond",
+        type_tag: "manga",
+        is_adult: false,
+        latest_chapter: 327,
+        status: "ongoing",
+      }),
+    });
+    const created = (await createRes.json()) as Comic;
+
+    const deleteRes = await request(`/comics/${created.comic_id}`, { method: "DELETE" });
+    expect(deleteRes.status).toBe(204);
+
+    const listRes = await request("/comics");
+    const list = (await listRes.json()) as Comic[];
+    expect(list).toEqual([]);
   });
 });

@@ -9,4 +9,5 @@ export interface ComicRepository {
     comicId: string,
     patch: Partial<Omit<Comic, "comic_id" | "created_at">>,
   ): Promise<Comic | undefined>;
+  deleteComic(userId: string, comicId: string): Promise<boolean>;
 }

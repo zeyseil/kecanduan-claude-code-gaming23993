@@ -133,3 +133,12 @@ comics.patch("/:id", async (c) => {
   const updated = await store.updateComic(DEMO_USER_ID, id, patch);
   return c.json(updated);
 });
+
+comics.delete("/:id", async (c) => {
+  const store = getComicStore(c.env);
+  const deleted = await store.deleteComic(DEMO_USER_ID, c.req.param("id"));
+  if (!deleted) {
+    return c.json({ error: "comic tidak ditemukan" }, 404);
+  }
+  return c.body(null, 204);
+});

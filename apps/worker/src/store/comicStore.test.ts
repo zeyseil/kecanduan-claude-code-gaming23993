@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Comic } from "../types/comic";
 import { inMemoryComicRepository, resetInMemoryStore } from "./inMemoryComicRepository";
 
-const { listComics, insertComic, findComic, updateComic } = inMemoryComicRepository;
+const { listComics, insertComic, findComic, updateComic, deleteComic } = inMemoryComicRepository;
 
 function makeComic(overrides: Partial<Comic> = {}): Comic {
   const now = new Date().toISOString();
@@ -57,5 +57,15 @@ describe("inMemoryComicRepository", () => {
 
   it("returns undefined when updating a missing comic", async () => {
     expect(await updateComic("user-a", "missing", { latest_chapter: 2 })).toBeUndefined();
+  });
+
+  it("deletes a comic", async () => {
+    await insertComic("user-a", makeComic({ comic_id: "a1" }));
+    expect(await deleteComic("user-a", "a1")).toBe(true);
+    expect(await findComic("user-a", "a1")).toBeUndefined();
+  });
+
+  it("returns false when deleting a missing comic", async () => {
+    expect(await deleteComic("user-a", "missing")).toBe(false);
   });
 });

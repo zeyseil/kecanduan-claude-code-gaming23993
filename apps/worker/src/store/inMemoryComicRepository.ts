@@ -34,6 +34,14 @@ export const inMemoryComicRepository: ComicRepository = {
     Object.assign(comic, patch, { updated_at: new Date().toISOString() });
     return comic;
   },
+
+  async deleteComic(userId, comicId) {
+    const list = bucket(userId);
+    const index = list.findIndex((c) => c.comic_id === comicId);
+    if (index === -1) return false;
+    list.splice(index, 1);
+    return true;
+  },
 };
 
 /** Test-only: reset all state between test cases. */

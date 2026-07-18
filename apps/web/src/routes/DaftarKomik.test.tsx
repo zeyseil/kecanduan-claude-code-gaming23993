@@ -12,6 +12,7 @@ vi.mock("../lib/api/comics", async () => {
     fetchComics: vi.fn(),
     postComic: vi.fn(),
     patchComic: vi.fn(),
+    deleteComic: vi.fn(),
   };
 });
 
@@ -44,11 +45,13 @@ const BERSERK: Comic = {
 const fetchComicsMock = vi.mocked(api.fetchComics);
 const postComicMock = vi.mocked(api.postComic);
 const patchComicMock = vi.mocked(api.patchComic);
+const deleteComicMock = vi.mocked(api.deleteComic);
 
 beforeEach(() => {
   fetchComicsMock.mockReset();
   postComicMock.mockReset();
   patchComicMock.mockReset();
+  deleteComicMock.mockReset();
 });
 
 describe("DaftarKomik", () => {
@@ -86,7 +89,7 @@ describe("DaftarKomik", () => {
     await waitFor(() => expect(screen.getAllByText("Berserk").length).toBeGreaterThan(0));
   });
 
-  it("mengupdate chapter lewat tombol di kartu dan menampilkan angka baru", async () => {
+  it("membuka modal edit lewat card, menyimpan perubahan, dan menampilkan hasilnya di grid", async () => {
     const user = userEvent.setup();
     fetchComicsMock.mockResolvedValue([ONE_PIECE]);
     patchComicMock.mockResolvedValue({ ...ONE_PIECE, latest_chapter: 1121 });
@@ -94,14 +97,42 @@ describe("DaftarKomik", () => {
 
     await waitFor(() => expect(screen.getAllByText("One Piece").length).toBeGreaterThan(0));
 
-    await user.click(screen.getByRole("button", { name: "Update chapter" }));
+    const titleElements = screen.getAllByText("One Piece");
+    await user.click(titleElements[titleElements.length - 1]);
+    await user.click(screen.getByRole("button", { name: `Edit ${ONE_PIECE.title}` }));
+
+    expect(await screen.findByText(`Edit Komik — ${ONE_PIECE.title}`)).toBeInTheDocument();
+
     await user.clear(screen.getByLabelText("Chapter Terakhir Dibaca"));
     await user.type(screen.getByLabelText("Chapter Terakhir Dibaca"), "1121");
     await user.click(screen.getByRole("button", { name: "Simpan" }));
 
     await waitFor(() =>
-      expect(patchComicMock).toHaveBeenCalledWith("1", { latest_chapter: 1121 }),
+      expect(patchComicMock).toHaveBeenCalledWith(
+        "1",
+        expect.objectContaining({ latest_chapter: 1121 }),
+      ),
     );
     await waitFor(() => expect(screen.getAllByText(/Ch 1121/).length).toBeGreaterThan(0));
+  });
+
+  it("menghapus comic lewat modal edit setelah konfirmasi", async () => {
+    const user = userEvent.setup();
+    fetchComicsMock.mockResolvedValue([ONE_PIECE]);
+    deleteComicMock.mockResolvedValue(undefined);
+    render(<DaftarKomik />);
+
+    await waitFor(() => expect(screen.getAllByText("One Piece").length).toBeGreaterThan(0));
+
+    const titleElements = screen.getAllByText("One Piece");
+    await user.click(titleElements[titleElements.length - 1]);
+    await user.click(screen.getByRole("button", { name: `Edit ${ONE_PIECE.title}` }));
+    await screen.findByText(`Edit Komik — ${ONE_PIECE.title}`);
+
+    await user.click(screen.getByRole("button", { name: "Hapus" }));
+    await user.click(screen.getByRole("button", { name: "Ya, hapus" }));
+
+    await waitFor(() => expect(deleteComicMock).toHaveBeenCalledWith("1"));
+    await waitFor(() => expect(screen.queryByText("One Piece")).not.toBeInTheDocument());
   });
 });
