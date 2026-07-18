@@ -58,6 +58,8 @@ Kalau import JSON gagal untuk node tertentu, buat **Custom Component** baru di L
 
 Setelah paste kode, cek toolbar node (tombol **"Tool Mode"** di pojok kanan atas saat node di-select) — toggle-nya harus otomatis muncul dan aktif. Baru setelah itu output **"Toolset"** bisa dihubungkan ke input "Tools" pada node Agent.
 
+**Catatan reserved word:** `status` adalah nama field terpisah (reserved) di base class `Component` Langflow dan TIDAK BOLEH dipakai sebagai nama input — kode di bawah sudah pakai `comic_status` sebagai gantinya (body yang dikirim ke Worker tetap pakai key `"status"` sesuai TOOL_CONTRACTS.md, cuma nama variabel Python-nya yang beda). Kalau ada nama input lain yang bikin error serupa ("reserved word"), ganti saja nama field itu (bebas), yang penting body JSON yang dikirim ke `/internal/tools/*` tetap pakai nama field sesuai kontrak.
+
 ### 1. cari_komik_mirip → `Tool-find-similar`
 
 ```python
@@ -114,7 +116,7 @@ class CreateComicTool(Component):
         StrInput(name="type_tag", display_name="Jenis (manga/manhwa/manhua)", required=True, tool_mode=True),
         BoolInput(name="is_adult", display_name="Is Adult", required=True, tool_mode=True),
         FloatInput(name="chapter", display_name="Chapter", required=True, tool_mode=True),
-        StrInput(name="status", display_name="Status (completed atau kosong)", value="", tool_mode=True, advanced=True),
+        StrInput(name="comic_status", display_name="Status (completed atau kosong)", value="", tool_mode=True, advanced=True),
         StrInput(name="worker_base_url", display_name="Worker Base URL",
                  value="http://localhost:8787", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
@@ -130,7 +132,7 @@ class CreateComicTool(Component):
                 "type_tag": self.type_tag,
                 "is_adult": self.is_adult,
                 "chapter": self.chapter,
-                "status": self.status or None,
+                "status": self.comic_status or None,
             },
             headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.user_id},
             timeout=10,
@@ -156,7 +158,7 @@ class UpdateChapterTool(Component):
     inputs = [
         StrInput(name="comic_id", display_name="Comic Id", required=True, tool_mode=True),
         FloatInput(name="chapter", display_name="Chapter", required=True, tool_mode=True),
-        StrInput(name="status", display_name="Status (completed atau kosong)", value="", tool_mode=True, advanced=True),
+        StrInput(name="comic_status", display_name="Status (completed atau kosong)", value="", tool_mode=True, advanced=True),
         StrInput(name="worker_base_url", display_name="Worker Base URL",
                  value="http://localhost:8787", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
@@ -167,7 +169,7 @@ class UpdateChapterTool(Component):
     def run(self) -> Data:
         res = httpx.post(
             f"{self.worker_base_url}/internal/tools/update-chapter",
-            json={"comic_id": self.comic_id, "chapter": self.chapter, "status": self.status or None},
+            json={"comic_id": self.comic_id, "chapter": self.chapter, "status": self.comic_status or None},
             headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.user_id},
             timeout=10,
         )
