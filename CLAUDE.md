@@ -50,7 +50,31 @@ Slice kelima (branch `feat/add-comic-and-recent-strip`, lanjutan): tombol "Updat
 - Total test: `pnpm --filter web test` → 44 hijau (`patchComic` di `comics.test.ts`, `ComicCard.test.tsx` tombol, `UpdateChapterForm.test.tsx` baru, alur update di `DaftarKomik.test.tsx`).
 - Sudah diverifikasi end-to-end di browser: tambah komik → klik "Update chapter" → ubah angka → submit → kartu ter-update tanpa reload, tersimpan di Worker (dicek via curl). Skenario Worker mati: modal tetap terbuka dengan pesan error, comic di grid tidak berubah.
 
-BELUM dibuat: wrapper Tauri & Capacitor, integrasi Langflow/Astra DB nyata, endpoint `/internal/tools/*`, auth token+KV, persistensi (localStorage untuk web kalau backend down, Astra DB untuk worker), update field lain selain `latest_chapter` dari UI (title/type_tag/status/cover — endpoint Worker sudah mendukung, tapi belum ada UI-nya).
+Slice keenam (branch `feat/add-comic-and-recent-strip`, lanjutan): ganti storage in-memory Worker dengan **Astra DB nyata**, pakai **Astra Data API** (HTTP/JSON, bukan CQL driver — driver Cassandra native tidak jalan baik di runtime Cloudflare Workers). Scope dibatasi ke collection `comics` saja — table `process_log` (audit trail, SPEC.md §9) DITUNDA ke task terpisah.
+- Dependency baru: `@datastax/astra-db-ts` (runtime dep), `tsx` (devDep, untuk jalankan script sekali-jalan).
+- `apps/worker/src/env.ts` (baru): interface `Env` (`ASTRA_DB_API_ENDPOINT`, `ASTRA_DB_APPLICATION_TOKEN`, `ASTRA_DB_COLLECTION`), dipakai sebagai `Hono<{ Bindings: Env }>` di `index.ts` dan `routes/comics.ts`.
+- Storage dipecah jadi abstraksi `ComicRepository` (`apps/worker/src/store/comicRepository.ts`, interface 4 method async) dengan dua implementasi: `astraComicRepository.ts` (nyata, pakai `astraClient.ts` → `getCollection(env)` bikin `DataAPIClient` per-panggilan, TIDAK di-cache di module scope) dan `inMemoryComicRepository.ts` (test-only, menggantikan `resetStore()` lama via `resetInMemoryStore()`).
+- `comicStore.ts` sekarang factory tipis: `getComicStore(env: Env): ComicRepository` → selalu resolve ke Astra di runtime nyata. Semua fungsi jadi **async** — `routes/comics.ts` sekarang `await` tiap panggilan store dan pass `c.env`.
+- Trade-off yang dicatat: Astra Data API menyimpan dokumen di collection (schemaless), BUKAN CQL table dengan partition/clustering key literal seperti draf skema SPEC.md §5 — `user_id` jadi filter field biasa per dokumen, bukan partition key fisik. Untuk skala aplikasi ini (single demo user) tidak masalah, tapi ini penyimpangan yang disengaja dari SPEC.md.
+- `comic_id` TETAP field aplikasi terpisah (UUID via `crypto.randomUUID()`, sama seperti sebelumnya) — TIDAK memakai `_id` bawaan Astra, supaya tipe `Comic` identik antara `apps/web` dan `apps/worker` tanpa bocornya konsep Astra ke frontend.
+- Kredensial: `apps/worker/.dev.vars.example` (di-commit, placeholder) → user copy jadi `.dev.vars` (gitignored, isi kredensial asli sendiri — Claude tidak pernah mengisi token). Root `.gitignore` ditambah `.dev.vars`/`.dev.vars.*` (kecuali `.dev.vars.example`). Untuk prod: `wrangler secret put ASTRA_DB_API_ENDPOINT|ASTRA_DB_APPLICATION_TOKEN|ASTRA_DB_COLLECTION` (dijalankan user sendiri).
+- `apps/worker/scripts/create-collection.ts` (baru, script `pnpm --filter worker run create-collection`): bikin collection Astra sekali kalau belum ada — sengaja TIDAK dipanggil otomatis dari Worker (bukan bagian hot path request).
+- `apps/worker/README.md` (baru): dokumentasi setup Astra DB lokal + deploy.
+- Test: `comicStore.test.ts` sekarang pakai `inMemoryComicRepository` langsung (tanpa network). `routes/comics.test.ts` mock module `@datastax/astra-db-ts` via `vi.mock` (fake `DataAPIClient`/collection in-memory) — jadi `comicStore`/`astraComicRepository`/`routes/comics.ts` tetap diuji beneran, hanya boundary network yang di-stub. Total tetap `pnpm --filter worker test` → 13 hijau.
+- BELUM diverifikasi end-to-end dengan Astra DB sungguhan (butuh kredensial user) — lihat langkah verifikasi manual di bawah.
+
+BELUM dibuat: wrapper Tauri & Capacitor, integrasi Langflow nyata, endpoint `/internal/tools/*`, auth token+KV, table `process_log` (audit trail), persistensi localStorage untuk web kalau backend down, update field lain selain `latest_chapter` dari UI (title/type_tag/status/cover — endpoint Worker sudah mendukung, tapi belum ada UI-nya).
+
+## Verifikasi Manual — Astra DB (Slice keenam)
+1. `cd apps/worker && cp .dev.vars.example .dev.vars`, isi `ASTRA_DB_API_ENDPOINT`/`ASTRA_DB_APPLICATION_TOKEN`/`ASTRA_DB_COLLECTION` dengan kredensial Astra DB asli (dari Astra Console).
+2. `pnpm --filter worker run create-collection` — buat collection sekali (aman dijalankan berkali-kali, no-op kalau sudah ada).
+3. `pnpm --filter worker test` → harus tetap 13 hijau (hanya hit mock, bukan Astra DB sungguhan).
+4. `pnpm --filter worker dev`, lalu:
+   - `curl -X POST localhost:8787/comics -H "Content-Type: application/json" -d '{"title":"Test","type_tag":"manga","is_adult":false,"latest_chapter":1,"status":"ongoing"}'`
+   - `curl localhost:8787/comics` → comic barusan harus muncul
+   - `curl -X PATCH localhost:8787/comics/<comic_id> -H "Content-Type: application/json" -d '{"latest_chapter":2}'`
+5. **Stop lalu start ulang `wrangler dev`**, `curl localhost:8787/comics` lagi — comic yang dibuat di langkah 4 harus MASIH ADA (bukti persistensi nyata, beda dari behavior in-memory sebelumnya yang hilang tiap restart).
+6. Opsional: cek Astra Data Explorer (web UI) untuk lihat dokumen dengan `user_id: "demo-user"` tersimpan di collection.
 
 ## Stack
 - Frontend: React, dibungkus Tauri (desktop) & Capacitor (Android) — satu codebase

@@ -1,0 +1,42 @@
+import type { Comic } from "../types/comic";
+import type { ComicRepository } from "./comicRepository";
+
+// Test-only repository: in-memory, keyed by user_id. Mirrors the old stub
+// store's semantics so comicStore.test.ts stays a fast, dependency-free unit test.
+const comicsByUser = new Map<string, Comic[]>();
+
+function bucket(userId: string): Comic[] {
+  let list = comicsByUser.get(userId);
+  if (!list) {
+    list = [];
+    comicsByUser.set(userId, list);
+  }
+  return list;
+}
+
+export const inMemoryComicRepository: ComicRepository = {
+  async listComics(userId) {
+    return bucket(userId).slice();
+  },
+
+  async insertComic(userId, comic) {
+    bucket(userId).push(comic);
+    return comic;
+  },
+
+  async findComic(userId, comicId) {
+    return bucket(userId).find((c) => c.comic_id === comicId);
+  },
+
+  async updateComic(userId, comicId, patch) {
+    const comic = bucket(userId).find((c) => c.comic_id === comicId);
+    if (!comic) return undefined;
+    Object.assign(comic, patch, { updated_at: new Date().toISOString() });
+    return comic;
+  },
+};
+
+/** Test-only: reset all state between test cases. */
+export function resetInMemoryStore(): void {
+  comicsByUser.clear();
+}
