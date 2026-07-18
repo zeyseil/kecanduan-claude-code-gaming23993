@@ -22,7 +22,17 @@ Slice kedua (PR #4, branch `feat/add-comic-and-recent-strip`, base `feat/fronten
 - Total test: `pnpm --filter web test` → 31 hijau.
 
 Perintah: `pnpm --filter web dev|build|test|lint`.
-BELUM dibuat: `apps/worker` (Hono), wrapper Tauri & Capacitor, semua endpoint tool & integrasi backend, persistensi (localStorage/Astra DB).
+
+Slice ketiga (branch `feat/add-comic-and-recent-strip`, lanjutan): scaffold `apps/worker` (Hono, dijalankan via `wrangler dev`, deps `hono` + devDeps `wrangler`/`@cloudflare/workers-types`).
+- Tipe `Comic` di-mirror manual ke `apps/worker/src/types/comic.ts` (belum ada shared package — harus dijaga tetap sinkron dengan `apps/web/src/types/comic.ts`).
+- Storage: `apps/worker/src/store/comicStore.ts`, in-memory `Map<user_id, Comic[]>` sebagai stub pengganti Astra DB — hilang saat cold start Worker, BUKAN persistensi nyata.
+- Auth per-user (token→user_id via KV) DITUNDA — semua handler pakai konstanta `DEMO_USER_ID = "demo-user"` hardcode di `apps/worker/src/routes/comics.ts`.
+- Endpoint: `GET /comics`, `POST /comics` (validasi field wajib), `PATCH /comics/:id` (404 kalau id tidak ada) — di `apps/worker/src/routes/comics.ts`. `POST /agent/process` di `apps/worker/src/routes/agent.ts` masih **stub**: validasi `teks_input`+`google_api_key` lalu balas `501 not_implemented` — BELUM memanggil Langflow beneran (belum ada instance Langflow yang di-deploy).
+- Endpoint internal (`/internal/tools/*`: find-similar, create-comic, update-chapter, fetch-cover, log-process) BELUM dibuat — di luar scope slice ini.
+- Test: `pnpm --filter worker test` → 13 hijau (comicStore, routes/comics, routes/agent via Hono `app.request`). Sudah dicoba manual dengan `wrangler dev` + curl (GET/POST/PATCH /comics jalan).
+- Perintah: `pnpm --filter worker dev|build|test|lint`. Root `package.json` scripts (`dev`/`build`/`test`/`lint`) TETAP hanya target `web` — tidak diubah untuk mencakup worker.
+
+BELUM dibuat: wrapper Tauri & Capacitor, integrasi Langflow/Astra DB nyata, endpoint `/internal/tools/*`, auth token+KV, persistensi (localStorage untuk web, Astra DB untuk worker).
 
 ## Stack
 - Frontend: React, dibungkus Tauri (desktop) & Capacitor (Android) — satu codebase
@@ -73,7 +83,7 @@ Harus nyaman di HP, tablet, laptop. Desain mobile-first.
 - Kalau saya tanya kenapa kamu menulis sesuatu, jelaskan sejujurnya. Termasuk
    kalau itu pilihan yang lemah.
 - **PENTING: Setiap sesi selesai, perbarui file
-   ini (CLAUDE.md). Ini menjaga CLAUDE.md tetap akurat sebagai single source of
+   ini (CLAUDE.md) menyesuaikan format yang telah ada(jika ada). Ini menjaga CLAUDE.md tetap akurat sebagai single source of
    truth untuk apa yang sudah dikerjakan.
 
 ## Git Workflow
