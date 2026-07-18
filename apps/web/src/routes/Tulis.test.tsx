@@ -50,8 +50,21 @@ describe("Tulis", () => {
     expect(processAgentTextMock).not.toHaveBeenCalled();
   });
 
-  it("memanggil processAgentText dan menampilkan hasil saat sukses", async () => {
-    processAgentTextMock.mockResolvedValue({ session_id: "abc", outputs: [] });
+  it("memanggil processAgentText dan menampilkan ringkasan human-readable saat sukses", async () => {
+    processAgentTextMock.mockResolvedValue({
+      session_id: "abc",
+      outputs: [
+        {
+          outputs: [
+            {
+              outputs: {
+                message: { message: "Chapter komik Naruto diupdate ke 56.", type: "text" },
+              },
+            },
+          ],
+        },
+      ],
+    });
     const user = userEvent.setup();
     render(<Tulis />);
 
@@ -66,6 +79,7 @@ describe("Tulis", () => {
       });
     });
     expect(await screen.findByText(/hasil dari ai agent/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/chapter komik naruto diupdate ke 56/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/"session_id": "abc"/)).toBeInTheDocument();
   });
 

@@ -2,13 +2,14 @@ import { useState } from "react";
 import { TextEditor } from "../components/TextEditor";
 import { processAgentText } from "../lib/api/agent";
 import { getGoogleApiKey, setGoogleApiKey } from "../lib/storage";
+import { extractAgentMessage } from "../lib/parseAgentResult";
 
 type Status = "idle" | "processing" | "success" | "error";
 
 export function Tulis() {
   const [apiKey, setApiKey] = useState(() => getGoogleApiKey());
   const [status, setStatus] = useState<Status>("idle");
-  const [resultText, setResultText] = useState<string | null>(null);
+  const [result, setResult] = useState<unknown>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleApiKeyChange = (value: string) => {
@@ -25,11 +26,11 @@ export function Tulis() {
 
     setStatus("processing");
     setErrorMsg(null);
-    setResultText(null);
+    setResult(null);
 
     try {
-      const result = await processAgentText({ teks_input: text, google_api_key: apiKey });
-      setResultText(JSON.stringify(result, null, 2));
+      const response = await processAgentText({ teks_input: text, google_api_key: apiKey });
+      setResult(response);
       setStatus("success");
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Gagal memproses teks.");
@@ -82,14 +83,27 @@ export function Tulis() {
         </div>
       )}
 
-      {status === "success" && resultText && (
+      {status === "success" && result !== null && (
         <div className="mt-4 rounded-md border border-slate-700 bg-slate-800 p-3">
           <p className="mb-1 text-xs uppercase tracking-wide text-slate-400">
             Hasil dari AI agent
           </p>
-          <pre className="whitespace-pre-wrap font-mono text-xs text-slate-200">
-            {resultText}
-          </pre>
+          {extractAgentMessage(result) ? (
+            <p className="text-sm text-slate-100">{extractAgentMessage(result)}</p>
+          ) : (
+            <p className="text-sm text-slate-400">
+              Tidak bisa membaca ringkasan balasan (bentuk respons tidak dikenal) — lihat detail
+              JSON di bawah.
+            </p>
+          )}
+          <details className="mt-2">
+            <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-400">
+              Lihat detail JSON
+            </summary>
+            <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-slate-300">
+              {JSON.stringify(result, null, 2)}
+            </pre>
+          </details>
         </div>
       )}
     </div>

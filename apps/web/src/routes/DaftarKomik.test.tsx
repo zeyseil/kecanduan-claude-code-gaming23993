@@ -116,6 +116,20 @@ describe("DaftarKomik", () => {
     await waitFor(() => expect(screen.getAllByText(/Ch 1121/).length).toBeGreaterThan(0));
   });
 
+  it("membuka search palette lewat tombol dan memilih hasil membuka modal edit", async () => {
+    const user = userEvent.setup();
+    fetchComicsMock.mockResolvedValue([ONE_PIECE, BERSERK]);
+    render(<DaftarKomik />);
+
+    await waitFor(() => expect(screen.getAllByText("One Piece").length).toBeGreaterThan(0));
+
+    await user.click(screen.getByRole("button", { name: /cari judul/i }));
+    await user.type(screen.getByLabelText("Cari judul komik"), "berserk");
+    await user.click(screen.getByRole("button", { name: /berserk/i }));
+
+    expect(await screen.findByText(`Edit Komik — ${BERSERK.title}`)).toBeInTheDocument();
+  });
+
   it("menghapus comic lewat modal edit setelah konfirmasi", async () => {
     const user = userEvent.setup();
     fetchComicsMock.mockResolvedValue([ONE_PIECE]);
