@@ -50,9 +50,13 @@ ATURAN WAJIB (tidak boleh dilanggar):
 Setelah semua tool selesai, balas user dalam bahasa Indonesia singkat: apa yang terjadi (komik baru dibuat / chapter diupdate dari X ke Y / atau daftar pilihan kalau ambigu).
 ```
 
-## Kode Python 5 Custom Component (tool_mode=True)
+## Kode Python 5 Custom Component
 
-Kalau import JSON gagal untuk node tertentu, buat **Custom Component** baru di Langflow UI, tempel kode di bawah, aktifkan toggle **Tool Mode**, lalu hubungkan output-nya ke input "Tools" pada node Agent.
+Kalau import JSON gagal untuk node tertentu, buat **Custom Component** baru di Langflow UI dan tempel kode di bawah.
+
+**Penting soal Tool Mode:** `tool_mode=True` HARUS dipasang di masing-masing `Input` yang ingin diisi oleh Agent (bukan sebagai atribut class `tool_mode = True` di level `Component` — kalau dipasang di situ, tombol Tool Mode di toolbar node malah hilang/tidak muncul di beberapa versi Langflow). Kode di bawah sudah diperbaiki: `tool_mode=True` ada di tiap input yang boleh diisi Agent (mis. `candidate_title`, `title`, `chapter`, dst) — TIDAK dipasang di `worker_base_url`/`internal_secret`/`user_id` karena tiga field itu harus tetap fixed lewat tweaks, bukan ditentukan Agent.
+
+Setelah paste kode, cek toolbar node (tombol **"Tool Mode"** di pojok kanan atas saat node di-select) — toggle-nya harus otomatis muncul dan aktif. Baru setelah itu output **"Toolset"** bisa dihubungkan ke input "Tools" pada node Agent.
 
 ### 1. cari_komik_mirip → `Tool-find-similar`
 
@@ -70,10 +74,9 @@ class FindSimilarTool(Component):
         "tool create/update lain — jangan menebak sendiri kecocokan judul."
     )
     icon = "search"
-    tool_mode = True
 
     inputs = [
-        StrInput(name="candidate_title", display_name="Judul Kandidat", required=True),
+        StrInput(name="candidate_title", display_name="Judul Kandidat", required=True, tool_mode=True),
         StrInput(name="worker_base_url", display_name="Worker Base URL",
                  value="http://localhost:8787", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
@@ -105,14 +108,13 @@ class CreateComicTool(Component):
     display_name = "buat_entry_baru"
     description = "Buat entry komik baru. Hanya panggil kalau cari_komik_mirip tidak menemukan kecocokan (skor < 0.5)."
     icon = "plus"
-    tool_mode = True
 
     inputs = [
-        StrInput(name="title", display_name="Judul", required=True),
-        StrInput(name="type_tag", display_name="Jenis (manga/manhwa/manhua)", required=True),
-        BoolInput(name="is_adult", display_name="Is Adult", required=True),
-        FloatInput(name="chapter", display_name="Chapter", required=True),
-        StrInput(name="status", display_name="Status (completed atau kosong)", value="", advanced=True),
+        StrInput(name="title", display_name="Judul", required=True, tool_mode=True),
+        StrInput(name="type_tag", display_name="Jenis (manga/manhwa/manhua)", required=True, tool_mode=True),
+        BoolInput(name="is_adult", display_name="Is Adult", required=True, tool_mode=True),
+        FloatInput(name="chapter", display_name="Chapter", required=True, tool_mode=True),
+        StrInput(name="status", display_name="Status (completed atau kosong)", value="", tool_mode=True, advanced=True),
         StrInput(name="worker_base_url", display_name="Worker Base URL",
                  value="http://localhost:8787", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
@@ -150,12 +152,11 @@ class UpdateChapterTool(Component):
     display_name = "update_chapter"
     description = "Update chapter komik yang sudah ada (comic_id dari hasil cari_komik_mirip)."
     icon = "refresh-cw"
-    tool_mode = True
 
     inputs = [
-        StrInput(name="comic_id", display_name="Comic Id", required=True),
-        FloatInput(name="chapter", display_name="Chapter", required=True),
-        StrInput(name="status", display_name="Status (completed atau kosong)", value="", advanced=True),
+        StrInput(name="comic_id", display_name="Comic Id", required=True, tool_mode=True),
+        FloatInput(name="chapter", display_name="Chapter", required=True, tool_mode=True),
+        StrInput(name="status", display_name="Status (completed atau kosong)", value="", tool_mode=True, advanced=True),
         StrInput(name="worker_base_url", display_name="Worker Base URL",
                  value="http://localhost:8787", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
@@ -187,10 +188,9 @@ class FetchCoverTool(Component):
     display_name = "cari_cover_mangadex"
     description = "Cari cover komik dari MangaDex. Hanya panggil setelah buat_entry_baru sukses."
     icon = "image"
-    tool_mode = True
 
     inputs = [
-        StrInput(name="title", display_name="Judul", required=True),
+        StrInput(name="title", display_name="Judul", required=True, tool_mode=True),
         StrInput(name="worker_base_url", display_name="Worker Base URL",
                  value="http://localhost:8787", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
@@ -222,14 +222,13 @@ class LogProcessTool(Component):
     display_name = "log_proses"
     description = "WAJIB dipanggil di akhir, di SETIAP cabang (created/updated/ambiguous) — audit trail."
     icon = "file-text"
-    tool_mode = True
 
     inputs = [
-        StrInput(name="input_text", display_name="Teks Input Asli", required=True),
-        StrInput(name="ai_action", display_name="Aksi (created/updated/ambiguous)", required=True),
+        StrInput(name="input_text", display_name="Teks Input Asli", required=True, tool_mode=True),
+        StrInput(name="ai_action", display_name="Aksi (created/updated/ambiguous)", required=True, tool_mode=True),
         StrInput(name="target_comic_id", display_name="Target Comic Id (kosong kalau ambiguous)",
-                  value="", advanced=True),
-        BoolInput(name="confirmed", display_name="Confirmed", required=True),
+                  value="", tool_mode=True, advanced=True),
+        BoolInput(name="confirmed", display_name="Confirmed", required=True, tool_mode=True),
         StrInput(name="worker_base_url", display_name="Worker Base URL",
                  value="http://localhost:8787", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
