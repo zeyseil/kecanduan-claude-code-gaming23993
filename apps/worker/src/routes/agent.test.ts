@@ -55,8 +55,13 @@ vi.mock("@datastax/astra-db-ts", () => {
       return doc;
     }
 
-    async deleteOne() {
-      return { deletedCount: 0 };
+    async deleteOne(filter: { user_id: string; comic_id: string }) {
+      const index = this.docs.findIndex(
+        (d) => d.user_id === filter.user_id && d.comic_id === filter.comic_id,
+      );
+      if (index === -1) return { deletedCount: 0 };
+      this.docs.splice(index, 1);
+      return { deletedCount: 1 };
     }
   }
 
@@ -451,6 +456,39 @@ describe("/agent/process", () => {
       error: expect.stringContaining("sedang penuh"),
     });
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("rolls back a comic created earlier this run when a later turn fails for good", async () => {
+    // Reproduces what was observed during real end-to-end testing: create
+    // succeeds, then Gemini fails (quota/503) before fetch-cover/set_cover/
+    // log_proses ever run — the comic must not be left behind as an orphan.
+    let turn = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (!String(url).includes("generativelanguage.googleapis.com")) {
+          throw new Error(`fetch tak terduga ke ${url}`);
+        }
+        turn++;
+        if (turn === 1) return geminiReply([call("cari_komik_mirip", { candidate_title: "One Piece" })]);
+        if (turn === 2) {
+          return geminiReply([
+            call("buat_entry_baru", {
+              title: "One Piece",
+              type_tag: "manga",
+              is_adult: false,
+              chapter: 3,
+            }),
+          ]);
+        }
+        // Every turn after the comic is created keeps failing (quota/high-demand).
+        return new Response("busy", { status: 503 });
+      }),
+    );
+
+    const res = await request({ teks_input: "baru baca One Piece ch3", google_api_key: "gk-1" });
+    expect(res.status).toBe(502);
+    expect(comicDocs).toHaveLength(0); // no orphan left behind
   });
 
   it("returns 502 when the Gemini request throws (network/timeout)", async () => {
