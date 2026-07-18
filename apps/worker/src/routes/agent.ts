@@ -44,7 +44,10 @@ agent.post("/process", async (c) => {
   for (const toolId of TOOL_COMPONENT_IDS) {
     tweaks[toolId] = {
       internal_secret: c.env.INTERNAL_TOOLS_SECRET,
-      user_id: DEMO_USER_ID,
+      // Field name is "app_user_id", not "user_id" — Langflow silently
+      // overrides any field literally named "user_id" with its own platform
+      // user id, ignoring both default value and tweaks. See langflow/README.md.
+      app_user_id: DEMO_USER_ID,
     };
   }
 

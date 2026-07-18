@@ -60,6 +60,8 @@ Setelah paste kode, cek toolbar node (tombol **"Tool Mode"** di pojok kanan atas
 
 **Catatan reserved word:** `status` adalah nama field terpisah (reserved) di base class `Component` Langflow dan TIDAK BOLEH dipakai sebagai nama input — kode di bawah sudah pakai `comic_status` sebagai gantinya (body yang dikirim ke Worker tetap pakai key `"status"` sesuai TOOL_CONTRACTS.md, cuma nama variabel Python-nya yang beda). Kalau ada nama input lain yang bikin error serupa ("reserved word"), ganti saja nama field itu (bebas), yang penting body JSON yang dikirim ke `/internal/tools/*` tetap pakai nama field sesuai kontrak.
 
+**Catatan field `user_id` (ditemukan lewat testing user):** nama field `user_id` ternyata di-override otomatis oleh Langflow (kemungkinan platform/hosted Langflow menyuntik nilai user_id akun sendiri ke field manapun yang PERSIS bernama `user_id`, mirip kasus `status` di atas tapi silent — tidak error, defaultnya cuma diam-diam ditimpa). Kode di bawah sudah pakai `app_user_id` sebagai gantinya. Kalau Anda menemukan field lain yang nilainya "tidak nurut" tweaks/default padahal sudah diisi benar, coba ganti namanya juga — kemungkinan bentrok dengan variabel reserved/otomatis serupa.
+
 ### 1. cari_komik_mirip → `Tool-find-similar`
 
 ```python
@@ -82,7 +84,7 @@ class FindSimilarTool(Component):
         StrInput(name="worker_base_url", display_name="Worker Base URL",
                  value="http://localhost:8787", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
-        StrInput(name="user_id", display_name="User Id", value="demo-user", advanced=True),
+        StrInput(name="app_user_id", display_name="App User Id", value="demo-user", advanced=True),
     ]
     outputs = [Output(display_name="Kandidat", name="candidates", method="run")]
 
@@ -90,7 +92,7 @@ class FindSimilarTool(Component):
         res = httpx.post(
             f"{self.worker_base_url}/internal/tools/find-similar",
             json={"candidate_title": self.candidate_title},
-            headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.user_id},
+            headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.app_user_id},
             timeout=10,
         )
         res.raise_for_status()
@@ -120,7 +122,7 @@ class CreateComicTool(Component):
         StrInput(name="worker_base_url", display_name="Worker Base URL",
                  value="http://localhost:8787", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
-        StrInput(name="user_id", display_name="User Id", value="demo-user", advanced=True),
+        StrInput(name="app_user_id", display_name="App User Id", value="demo-user", advanced=True),
     ]
     outputs = [Output(display_name="Hasil", name="result", method="run")]
 
@@ -134,7 +136,7 @@ class CreateComicTool(Component):
                 "chapter": self.chapter,
                 "status": self.comic_status or None,
             },
-            headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.user_id},
+            headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.app_user_id},
             timeout=10,
         )
         res.raise_for_status()
@@ -162,7 +164,7 @@ class UpdateChapterTool(Component):
         StrInput(name="worker_base_url", display_name="Worker Base URL",
                  value="http://localhost:8787", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
-        StrInput(name="user_id", display_name="User Id", value="demo-user", advanced=True),
+        StrInput(name="app_user_id", display_name="App User Id", value="demo-user", advanced=True),
     ]
     outputs = [Output(display_name="Hasil", name="result", method="run")]
 
@@ -170,7 +172,7 @@ class UpdateChapterTool(Component):
         res = httpx.post(
             f"{self.worker_base_url}/internal/tools/update-chapter",
             json={"comic_id": self.comic_id, "chapter": self.chapter, "status": self.comic_status or None},
-            headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.user_id},
+            headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.app_user_id},
             timeout=10,
         )
         res.raise_for_status()
@@ -196,7 +198,7 @@ class FetchCoverTool(Component):
         StrInput(name="worker_base_url", display_name="Worker Base URL",
                  value="http://localhost:8787", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
-        StrInput(name="user_id", display_name="User Id", value="demo-user", advanced=True),
+        StrInput(name="app_user_id", display_name="App User Id", value="demo-user", advanced=True),
     ]
     outputs = [Output(display_name="Hasil", name="result", method="run")]
 
@@ -204,7 +206,7 @@ class FetchCoverTool(Component):
         res = httpx.post(
             f"{self.worker_base_url}/internal/tools/fetch-cover",
             json={"title": self.title},
-            headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.user_id},
+            headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.app_user_id},
             timeout=10,
         )
         res.raise_for_status()
@@ -234,7 +236,7 @@ class LogProcessTool(Component):
         StrInput(name="worker_base_url", display_name="Worker Base URL",
                  value="http://localhost:8787", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
-        StrInput(name="user_id", display_name="User Id", value="demo-user", advanced=True),
+        StrInput(name="app_user_id", display_name="App User Id", value="demo-user", advanced=True),
     ]
     outputs = [Output(display_name="Hasil", name="result", method="run")]
 
@@ -247,7 +249,7 @@ class LogProcessTool(Component):
                 "target_comic_id": self.target_comic_id or None,
                 "confirmed": self.confirmed,
             },
-            headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.user_id},
+            headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.app_user_id},
             timeout=10,
         )
         res.raise_for_status()

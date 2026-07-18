@@ -64,7 +64,7 @@ describe("/agent/process", () => {
     expect(sentBody.tweaks["Agent-UVDzm"]).toEqual({ api_key: "gk-1" });
     expect(sentBody.tweaks["CustomComponent-zI7yQ"]).toEqual({
       internal_secret: "test-secret",
-      user_id: "demo-user",
+      app_user_id: "demo-user",
     });
   });
 
