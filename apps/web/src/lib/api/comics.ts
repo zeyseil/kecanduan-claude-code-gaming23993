@@ -12,7 +12,7 @@ export interface NewComicInput {
   cover_url: string | null;
 }
 
-async function errorMessage(res: Response): Promise<string> {
+export async function errorMessage(res: Response): Promise<string> {
   const body = await res.json().catch(() => null);
   if (body && typeof body === "object" && "error" in body && typeof body.error === "string") {
     return body.error;

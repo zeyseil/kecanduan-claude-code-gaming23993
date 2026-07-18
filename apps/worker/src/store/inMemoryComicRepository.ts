@@ -1,5 +1,6 @@
 import type { Comic } from "../types/comic";
 import type { ComicRepository } from "./comicRepository";
+import { rankCandidates } from "./fuzzyMatch";
 
 // Test-only repository: in-memory, keyed by user_id. Mirrors the old stub
 // store's semantics so comicStore.test.ts stays a fast, dependency-free unit test.
@@ -41,6 +42,10 @@ export const inMemoryComicRepository: ComicRepository = {
     if (index === -1) return false;
     list.splice(index, 1);
     return true;
+  },
+
+  async searchComics(userId, candidateTitle) {
+    return rankCandidates(bucket(userId), candidateTitle);
   },
 };
 

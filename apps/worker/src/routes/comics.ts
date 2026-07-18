@@ -71,7 +71,12 @@ comics.post("/", async (c) => {
   };
 
   const store = getComicStore(c.env);
-  await store.insertComic(DEMO_USER_ID, comic);
+  try {
+    await store.insertComic(DEMO_USER_ID, comic);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return c.json({ error: `Gagal menyimpan komik: ${message}` }, 500);
+  }
   return c.json(comic, 201);
 });
 
@@ -130,8 +135,13 @@ comics.patch("/:id", async (c) => {
     patch.cover_url = body.cover_url as string | null;
   }
 
-  const updated = await store.updateComic(DEMO_USER_ID, id, patch);
-  return c.json(updated);
+  try {
+    const updated = await store.updateComic(DEMO_USER_ID, id, patch);
+    return c.json(updated);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return c.json({ error: `Gagal menyimpan komik: ${message}` }, 500);
+  }
 });
 
 comics.delete("/:id", async (c) => {

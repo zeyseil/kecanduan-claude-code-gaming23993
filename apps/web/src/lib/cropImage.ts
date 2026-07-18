@@ -5,14 +5,23 @@ export interface PixelCrop {
   height: number;
 }
 
-/** Render area crop (dalam pixel gambar asli) ke data URL JPEG. */
+// Cover card hanya butuh resolusi kecil untuk ditampilkan — tanpa cap ini,
+// foto HP resolusi tinggi menghasilkan base64 beberapa MB yang gampang
+// melebihi limit ukuran dokumen Astra DB.
+const MAX_COVER_WIDTH = 800;
+
+/** Render area crop (dalam pixel gambar asli) ke data URL JPEG, di-downscale kalau lebih lebar dari MAX_COVER_WIDTH. */
 export function getCroppedImageDataUrl(
   image: HTMLImageElement,
   crop: PixelCrop,
 ): string {
+  const scale = crop.width > MAX_COVER_WIDTH ? MAX_COVER_WIDTH / crop.width : 1;
+  const outputWidth = Math.round(crop.width * scale);
+  const outputHeight = Math.round(crop.height * scale);
+
   const canvas = document.createElement("canvas");
-  canvas.width = crop.width;
-  canvas.height = crop.height;
+  canvas.width = outputWidth;
+  canvas.height = outputHeight;
 
   const ctx = canvas.getContext("2d");
   if (!ctx) {
@@ -27,8 +36,8 @@ export function getCroppedImageDataUrl(
     crop.height,
     0,
     0,
-    crop.width,
-    crop.height,
+    outputWidth,
+    outputHeight,
   );
 
   return canvas.toDataURL("image/jpeg", 0.9);

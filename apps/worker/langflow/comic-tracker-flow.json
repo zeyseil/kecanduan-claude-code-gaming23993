@@ -1,0 +1,237 @@
+{
+  "id": "4f2b6c8a-1a2b-4c3d-9e5f-comictracker01",
+  "name": "Comic Tracker Agent",
+  "description": "Baca README.md di folder ini sebelum import — scaffold best-effort, verifikasi tiap node setelah import ke Langflow Anda.",
+  "is_component": false,
+  "last_tested_version": "1.x",
+  "data": {
+    "viewport": { "x": 0, "y": 0, "zoom": 0.6 },
+    "nodes": [
+      {
+        "id": "ChatInput-comictracker",
+        "type": "genericNode",
+        "position": { "x": 0, "y": 300 },
+        "data": {
+          "id": "ChatInput-comictracker",
+          "type": "ChatInput",
+          "node": {
+            "display_name": "Chat Input",
+            "description": "Teks bebas dari halaman Tulis, dikirim lewat POST /agent/process di Worker.",
+            "base_classes": ["Message"],
+            "template": {
+              "input_value": { "type": "str", "value": "", "display_name": "Text" }
+            }
+          }
+        }
+      },
+      {
+        "id": "Agent-gemini",
+        "type": "genericNode",
+        "position": { "x": 400, "y": 300 },
+        "data": {
+          "id": "Agent-gemini",
+          "type": "Agent",
+          "node": {
+            "display_name": "Comic Tracker Agent",
+            "description": "Google Generative AI, tool calling aktif. Lihat README.md untuk system prompt lengkap.",
+            "base_classes": ["Message"],
+            "template": {
+              "model_provider": { "type": "str", "value": "Google Generative AI", "display_name": "Model Provider" },
+              "model_name": { "type": "str", "value": "gemini-2.0-flash", "display_name": "Model Name" },
+              "api_key": { "type": "SecretStr", "value": "", "display_name": "Google API Key", "info": "Diisi per-run lewat tweaks dari agent.ts, tidak disimpan permanen." },
+              "system_prompt": {
+                "type": "str",
+                "display_name": "System Prompt / Instructions",
+                "value": "Lihat README.md folder ini bagian 'System prompt untuk Agent' — wajib panggil cari_komik_mirip dulu, jangan auto-pilih saat ambigu, jangan gabungkan is_adult ke type_tag, wajib log_proses di semua cabang."
+              },
+              "input_value": { "type": "str", "value": "", "display_name": "Input", "info": "Dihubungkan dari Chat Input" },
+              "tools": { "type": "other", "list": true, "display_name": "Tools", "info": "Dihubungkan dari 5 Tool component di bawah" }
+            }
+          }
+        }
+      },
+      {
+        "id": "Tool-find-similar",
+        "type": "genericNode",
+        "position": { "x": 100, "y": 0 },
+        "data": {
+          "id": "Tool-find-similar",
+          "type": "CustomComponent",
+          "node": {
+            "display_name": "cari_komik_mirip",
+            "description": "Cari komik mirip judul kandidat. WAJIB dipanggil sebelum tool create/update lain — lihat README.md untuk kode Python lengkap.",
+            "base_classes": ["Tool"],
+            "template": {
+              "code": { "type": "code", "display_name": "Code", "info": "Salin dari README.md bagian '1. cari_komik_mirip'" },
+              "candidate_title": { "type": "str", "value": "", "display_name": "Judul Kandidat" },
+              "worker_base_url": { "type": "str", "value": "http://localhost:8787", "display_name": "Worker Base URL", "advanced": true },
+              "internal_secret": { "type": "str", "value": "", "display_name": "Internal Secret", "advanced": true },
+              "user_id": { "type": "str", "value": "demo-user", "display_name": "User Id", "advanced": true }
+            }
+          }
+        }
+      },
+      {
+        "id": "Tool-create-comic",
+        "type": "genericNode",
+        "position": { "x": 100, "y": 150 },
+        "data": {
+          "id": "Tool-create-comic",
+          "type": "CustomComponent",
+          "node": {
+            "display_name": "buat_entry_baru",
+            "description": "Buat entry komik baru. Hanya panggil kalau cari_komik_mirip tidak menemukan kecocokan — lihat README.md.",
+            "base_classes": ["Tool"],
+            "template": {
+              "code": { "type": "code", "display_name": "Code", "info": "Salin dari README.md bagian '2. buat_entry_baru'" },
+              "title": { "type": "str", "value": "", "display_name": "Judul" },
+              "type_tag": { "type": "str", "value": "", "display_name": "Jenis (manga/manhwa/manhua)" },
+              "is_adult": { "type": "bool", "value": false, "display_name": "Is Adult" },
+              "chapter": { "type": "float", "value": 0, "display_name": "Chapter" },
+              "status": { "type": "str", "value": "", "display_name": "Status (completed atau kosong)", "advanced": true },
+              "worker_base_url": { "type": "str", "value": "http://localhost:8787", "display_name": "Worker Base URL", "advanced": true },
+              "internal_secret": { "type": "str", "value": "", "display_name": "Internal Secret", "advanced": true },
+              "user_id": { "type": "str", "value": "demo-user", "display_name": "User Id", "advanced": true }
+            }
+          }
+        }
+      },
+      {
+        "id": "Tool-update-chapter",
+        "type": "genericNode",
+        "position": { "x": 100, "y": 300 },
+        "data": {
+          "id": "Tool-update-chapter",
+          "type": "CustomComponent",
+          "node": {
+            "display_name": "update_chapter",
+            "description": "Update chapter komik yang sudah ada — lihat README.md.",
+            "base_classes": ["Tool"],
+            "template": {
+              "code": { "type": "code", "display_name": "Code", "info": "Salin dari README.md bagian '3. update_chapter'" },
+              "comic_id": { "type": "str", "value": "", "display_name": "Comic Id" },
+              "chapter": { "type": "float", "value": 0, "display_name": "Chapter" },
+              "status": { "type": "str", "value": "", "display_name": "Status (completed atau kosong)", "advanced": true },
+              "worker_base_url": { "type": "str", "value": "http://localhost:8787", "display_name": "Worker Base URL", "advanced": true },
+              "internal_secret": { "type": "str", "value": "", "display_name": "Internal Secret", "advanced": true },
+              "user_id": { "type": "str", "value": "demo-user", "display_name": "User Id", "advanced": true }
+            }
+          }
+        }
+      },
+      {
+        "id": "Tool-fetch-cover",
+        "type": "genericNode",
+        "position": { "x": 100, "y": 450 },
+        "data": {
+          "id": "Tool-fetch-cover",
+          "type": "CustomComponent",
+          "node": {
+            "display_name": "cari_cover_mangadex",
+            "description": "Cari cover komik dari MangaDex. Hanya panggil setelah buat_entry_baru sukses — lihat README.md.",
+            "base_classes": ["Tool"],
+            "template": {
+              "code": { "type": "code", "display_name": "Code", "info": "Salin dari README.md bagian '4. cari_cover_mangadex'" },
+              "title": { "type": "str", "value": "", "display_name": "Judul" },
+              "worker_base_url": { "type": "str", "value": "http://localhost:8787", "display_name": "Worker Base URL", "advanced": true },
+              "internal_secret": { "type": "str", "value": "", "display_name": "Internal Secret", "advanced": true },
+              "user_id": { "type": "str", "value": "demo-user", "display_name": "User Id", "advanced": true }
+            }
+          }
+        }
+      },
+      {
+        "id": "Tool-log-process",
+        "type": "genericNode",
+        "position": { "x": 100, "y": 600 },
+        "data": {
+          "id": "Tool-log-process",
+          "type": "CustomComponent",
+          "node": {
+            "display_name": "log_proses",
+            "description": "WAJIB dipanggil di akhir, di semua cabang (created/updated/ambiguous) — audit trail. Lihat README.md.",
+            "base_classes": ["Tool"],
+            "template": {
+              "code": { "type": "code", "display_name": "Code", "info": "Salin dari README.md bagian '5. log_proses'" },
+              "input_text": { "type": "str", "value": "", "display_name": "Teks Input Asli" },
+              "ai_action": { "type": "str", "value": "", "display_name": "Aksi (created/updated/ambiguous)" },
+              "target_comic_id": { "type": "str", "value": "", "display_name": "Target Comic Id (kosong kalau ambiguous)", "advanced": true },
+              "confirmed": { "type": "bool", "value": false, "display_name": "Confirmed" },
+              "worker_base_url": { "type": "str", "value": "http://localhost:8787", "display_name": "Worker Base URL", "advanced": true },
+              "internal_secret": { "type": "str", "value": "", "display_name": "Internal Secret", "advanced": true },
+              "user_id": { "type": "str", "value": "demo-user", "display_name": "User Id", "advanced": true }
+            }
+          }
+        }
+      },
+      {
+        "id": "ChatOutput-comictracker",
+        "type": "genericNode",
+        "position": { "x": 800, "y": 300 },
+        "data": {
+          "id": "ChatOutput-comictracker",
+          "type": "ChatOutput",
+          "node": {
+            "display_name": "Chat Output",
+            "description": "Konfirmasi hasil dibalikkan ke /agent/process, diteruskan ke client.",
+            "base_classes": ["Message"],
+            "template": {
+              "input_value": { "type": "str", "value": "", "display_name": "Text" }
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge-chatinput-agent",
+        "source": "ChatInput-comictracker",
+        "target": "Agent-gemini",
+        "sourceHandle": "message",
+        "targetHandle": "input_value"
+      },
+      {
+        "id": "edge-tool-find-similar-agent",
+        "source": "Tool-find-similar",
+        "target": "Agent-gemini",
+        "sourceHandle": "tool",
+        "targetHandle": "tools"
+      },
+      {
+        "id": "edge-tool-create-comic-agent",
+        "source": "Tool-create-comic",
+        "target": "Agent-gemini",
+        "sourceHandle": "tool",
+        "targetHandle": "tools"
+      },
+      {
+        "id": "edge-tool-update-chapter-agent",
+        "source": "Tool-update-chapter",
+        "target": "Agent-gemini",
+        "sourceHandle": "tool",
+        "targetHandle": "tools"
+      },
+      {
+        "id": "edge-tool-fetch-cover-agent",
+        "source": "Tool-fetch-cover",
+        "target": "Agent-gemini",
+        "sourceHandle": "tool",
+        "targetHandle": "tools"
+      },
+      {
+        "id": "edge-tool-log-process-agent",
+        "source": "Tool-log-process",
+        "target": "Agent-gemini",
+        "sourceHandle": "tool",
+        "targetHandle": "tools"
+      },
+      {
+        "id": "edge-agent-chatoutput",
+        "source": "Agent-gemini",
+        "target": "ChatOutput-comictracker",
+        "sourceHandle": "response",
+        "targetHandle": "input_value"
+      }
+    ]
+  }
+}

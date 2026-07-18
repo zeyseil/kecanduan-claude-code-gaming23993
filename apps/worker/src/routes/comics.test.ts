@@ -9,6 +9,7 @@ interface ComicDocument extends Comic {
 // boundary (@datastax/astra-db-ts) is mocked — comicStore/astraComicRepository
 // and the routes run for real against this fake collection.
 let documents: ComicDocument[] = [];
+let shouldFailWrite = false;
 
 vi.mock("@datastax/astra-db-ts", () => {
   class FakeCollection {
@@ -24,6 +25,9 @@ vi.mock("@datastax/astra-db-ts", () => {
     }
 
     async insertOne(doc: ComicDocument) {
+      if (shouldFailWrite) {
+        throw new Error("Document size limit exceeded");
+      }
       documents.push(doc);
       return { insertedId: doc.comic_id };
     }
@@ -32,6 +36,9 @@ vi.mock("@datastax/astra-db-ts", () => {
       filter: { user_id: string; comic_id: string },
       update: { $set: Partial<ComicDocument> },
     ) {
+      if (shouldFailWrite) {
+        throw new Error("Document size limit exceeded");
+      }
       const doc = documents.find(
         (d) => d.user_id === filter.user_id && d.comic_id === filter.comic_id,
       );
@@ -80,6 +87,7 @@ function request(input: string, init?: RequestInit) {
 describe("/comics", () => {
   beforeEach(() => {
     documents = [];
+    shouldFailWrite = false;
   });
 
   it("lists no comics initially", async () => {
@@ -180,5 +188,49 @@ describe("/comics", () => {
     const listRes = await request("/comics");
     const list = (await listRes.json()) as Comic[];
     expect(list).toEqual([]);
+  });
+
+  it("returns a clear error message when the store fails to save on create", async () => {
+    shouldFailWrite = true;
+    const res = await request("/comics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Big Cover",
+        type_tag: "manga",
+        is_adult: false,
+        latest_chapter: 1,
+        status: "ongoing",
+      }),
+    });
+    expect(res.status).toBe(500);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("Gagal menyimpan komik");
+    expect(body.error).toContain("Document size limit exceeded");
+  });
+
+  it("returns a clear error message when the store fails to save on patch", async () => {
+    const createRes = await request("/comics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Big Cover",
+        type_tag: "manga",
+        is_adult: false,
+        latest_chapter: 1,
+        status: "ongoing",
+      }),
+    });
+    const created = (await createRes.json()) as Comic;
+
+    shouldFailWrite = true;
+    const patchRes = await request(`/comics/${created.comic_id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ latest_chapter: 2 }),
+    });
+    expect(patchRes.status).toBe(500);
+    const body = (await patchRes.json()) as { error: string };
+    expect(body.error).toContain("Gagal menyimpan komik");
   });
 });

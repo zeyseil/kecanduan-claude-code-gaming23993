@@ -1,8 +1,10 @@
 import { useMemo, useRef, useState } from "react";
 
 interface TextEditorProps {
-  /** Dipanggil saat tombol Proses ditekan. Untuk sekarang belum ke jaringan. */
+  /** Dipanggil saat tombol Proses ditekan. */
   onProcess?: (text: string) => void;
+  /** Nonaktifkan tombol proses (mis. saat request ke AI agent masih berjalan). */
+  disabled?: boolean;
 }
 
 const PLACEHOLDER = `Contoh format:
@@ -12,7 +14,7 @@ const PLACEHOLDER = `Contoh format:
 Atau bahasa bebas:
 baru baca solo leveling ch179 tamat`;
 
-export function TextEditor({ onProcess }: TextEditorProps) {
+export function TextEditor({ onProcess, disabled = false }: TextEditorProps) {
   const [text, setText] = useState("");
   const gutterRef = useRef<HTMLDivElement>(null);
 
@@ -61,10 +63,10 @@ export function TextEditor({ onProcess }: TextEditorProps) {
         <button
           type="button"
           onClick={handleProcess}
-          disabled={text.trim() === ""}
+          disabled={text.trim() === "" || disabled}
           className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
         >
-          Proses dengan AI
+          {disabled ? "Memproses…" : "Proses dengan AI"}
         </button>
       </div>
     </div>
