@@ -6,6 +6,12 @@
       "runtimeExecutable": "corepack",
       "runtimeArgs": ["pnpm@9.15.9", "--filter", "web", "dev", "--port", "5173", "--strictPort"],
       "port": 5173
+    },
+    {
+      "name": "worker",
+      "runtimeExecutable": "corepack",
+      "runtimeArgs": ["pnpm@9.15.9", "--filter", "worker", "dev", "--port", "8787"],
+      "port": 8787
     }
   ]
 }

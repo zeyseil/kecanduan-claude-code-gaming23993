@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchComics, patchComic, postComic } from "./comics";
+import { deleteComic, fetchComics, patchComic, postComic } from "./comics";
 import type { Comic } from "../../types/comic";
 
 const SAMPLE: Comic = {
@@ -136,5 +136,30 @@ describe("patchComic", () => {
     await expect(patchComic("missing", { latest_chapter: 5 })).rejects.toThrow(
       "comic tidak ditemukan",
     );
+  });
+});
+
+describe("deleteComic", () => {
+  it("mengirim DELETE ke /comics/:id", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await deleteComic("1");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8787/comics/1",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("throw dengan pesan error dari body saat response gagal", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: () => Promise.resolve({ error: "comic tidak ditemukan" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(deleteComic("missing")).rejects.toThrow("comic tidak ditemukan");
   });
 });

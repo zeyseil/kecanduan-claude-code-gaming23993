@@ -57,21 +57,30 @@ describe("ComicCard", () => {
     expect(screen.getByText("Tamat")).toBeInTheDocument();
   });
 
-  it("tidak menampilkan tombol update chapter kalau onUpdateChapter tidak diisi", () => {
-    render(<ComicCard comic={comic()} />);
-    expect(
-      screen.queryByRole("button", { name: "Update chapter" }),
-    ).not.toBeInTheDocument();
+  it("tidak menampilkan icon edit kalau tidak isPressed", () => {
+    render(<ComicCard comic={comic()} onPress={vi.fn()} onEdit={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /^Edit/ })).not.toBeInTheDocument();
   });
 
-  it("memanggil onUpdateChapter dengan comic yang benar saat tombol diklik", async () => {
+  it("memanggil onPress dengan comic_id saat card diklik", async () => {
     const user = userEvent.setup();
-    const onUpdateChapter = vi.fn();
+    const onPress = vi.fn();
+    render(<ComicCard comic={comic({ comic_id: "abc" })} onPress={onPress} />);
+
+    await user.click(screen.getByText("Contoh Komik"));
+
+    expect(onPress).toHaveBeenCalledWith("abc");
+  });
+
+  it("menampilkan icon edit saat isPressed dan memanggil onEdit dengan comic yang benar", async () => {
+    const user = userEvent.setup();
+    const onEdit = vi.fn();
     const c = comic({ comic_id: "abc" });
-    render(<ComicCard comic={c} onUpdateChapter={onUpdateChapter} />);
+    render(<ComicCard comic={c} isPressed onPress={vi.fn()} onEdit={onEdit} />);
 
-    await user.click(screen.getByRole("button", { name: "Update chapter" }));
+    const editButton = screen.getByRole("button", { name: `Edit ${c.title}` });
+    await user.click(editButton);
 
-    expect(onUpdateChapter).toHaveBeenCalledWith(c);
+    expect(onEdit).toHaveBeenCalledWith(c);
   });
 });

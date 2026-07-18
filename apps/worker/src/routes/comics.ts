@@ -1,7 +1,8 @@
 import { Hono } from "hono";
+import type { Env } from "../env";
 import type { Comic, Status, TypeTag } from "../types/comic";
 import { TYPE_TAGS, STATUSES } from "../types/comic";
-import { findComic, insertComic, listComics, updateComic } from "../store/comicStore";
+import { getComicStore } from "../store/comicStore";
 
 // Auth is deferred — every request acts on this fixed demo user.
 const DEMO_USER_ID = "demo-user";
@@ -41,10 +42,11 @@ function validateCreateBody(body: CreateComicBody): string | null {
   return null;
 }
 
-export const comics = new Hono();
+export const comics = new Hono<{ Bindings: Env }>();
 
-comics.get("/", (c) => {
-  return c.json(listComics(DEMO_USER_ID));
+comics.get("/", async (c) => {
+  const store = getComicStore(c.env);
+  return c.json(await store.listComics(DEMO_USER_ID));
 });
 
 comics.post("/", async (c) => {
@@ -68,13 +70,15 @@ comics.post("/", async (c) => {
     updated_at: now,
   };
 
-  insertComic(DEMO_USER_ID, comic);
+  const store = getComicStore(c.env);
+  await store.insertComic(DEMO_USER_ID, comic);
   return c.json(comic, 201);
 });
 
 comics.patch("/:id", async (c) => {
+  const store = getComicStore(c.env);
   const id = c.req.param("id");
-  if (!findComic(DEMO_USER_ID, id)) {
+  if (!(await store.findComic(DEMO_USER_ID, id))) {
     return c.json({ error: "comic tidak ditemukan" }, 404);
   }
 
@@ -126,6 +130,15 @@ comics.patch("/:id", async (c) => {
     patch.cover_url = body.cover_url as string | null;
   }
 
-  const updated = updateComic(DEMO_USER_ID, id, patch);
+  const updated = await store.updateComic(DEMO_USER_ID, id, patch);
   return c.json(updated);
+});
+
+comics.delete("/:id", async (c) => {
+  const store = getComicStore(c.env);
+  const deleted = await store.deleteComic(DEMO_USER_ID, c.req.param("id"));
+  if (!deleted) {
+    return c.json({ error: "comic tidak ditemukan" }, 404);
+  }
+  return c.body(null, 204);
 });

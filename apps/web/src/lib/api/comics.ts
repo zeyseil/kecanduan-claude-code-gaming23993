@@ -28,10 +28,11 @@ export async function fetchComics(): Promise<Comic[]> {
   return res.json() as Promise<Comic[]>;
 }
 
-export async function patchComic(
-  id: string,
-  patch: { latest_chapter: number },
-): Promise<Comic> {
+export type ComicPatch = Partial<
+  Pick<Comic, "title" | "aliases" | "type_tag" | "is_adult" | "latest_chapter" | "status" | "cover_url">
+>;
+
+export async function patchComic(id: string, patch: ComicPatch): Promise<Comic> {
   const res = await fetch(`${BASE_URL}/comics/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -41,6 +42,13 @@ export async function patchComic(
     throw new Error(await errorMessage(res));
   }
   return res.json() as Promise<Comic>;
+}
+
+export async function deleteComic(id: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}/comics/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error(await errorMessage(res));
+  }
 }
 
 export async function postComic(input: NewComicInput): Promise<Comic> {
