@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../env";
 import app from "../index";
 
+const fakeTokens = new Map([["test-token", "demo-user"]]);
+
 const testEnv: Env = {
   ASTRA_DB_API_ENDPOINT: "https://fake.apps.astra.datastax.com",
   ASTRA_DB_APPLICATION_TOKEN: "fake-token",
@@ -11,14 +13,20 @@ const testEnv: Env = {
   LANGFLOW_API_URL: "https://fake-langflow/api/v1/run/fake-flow",
   LANGFLOW_API_KEY: "fake-langflow-key",
   RATE_LIMITER: {} as Env["RATE_LIMITER"],
+  AUTH_TOKENS: {
+    get: async (key: string) => fakeTokens.get(key) ?? null,
+  } as Env["AUTH_TOKENS"],
 };
 
-function request(body: unknown) {
+function request(body: unknown, token: string | null = "test-token") {
   return app.request(
     "/agent/process",
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify(body),
     },
     testEnv,
@@ -32,6 +40,11 @@ describe("/agent/process", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("rejects requests without a valid Authorization token", async () => {
+    const res = await request({ teks_input: "test", google_api_key: "dummy" }, null);
+    expect(res.status).toBe(401);
   });
 
   it("rejects missing teks_input", async () => {

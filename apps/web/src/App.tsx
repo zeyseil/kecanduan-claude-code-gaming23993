@@ -1,6 +1,8 @@
 import { NavLink, Route, Routes } from "react-router-dom";
 import { DaftarKomik } from "./routes/DaftarKomik";
 import { Tulis } from "./routes/Tulis";
+import { Login } from "./routes/Login";
+import { RequireAuth } from "./components/RequireAuth";
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   [
@@ -31,8 +33,23 @@ export function App() {
 
       <main className="mx-auto max-w-6xl px-4 py-5">
         <Routes>
-          <Route path="/" element={<DaftarKomik />} />
-          <Route path="/tulis" element={<Tulis />} />
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/"
+            element={
+              <RequireAuth>
+                <DaftarKomik />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/tulis"
+            element={
+              <RequireAuth>
+                <Tulis />
+              </RequireAuth>
+            }
+          />
         </Routes>
       </main>
     </div>

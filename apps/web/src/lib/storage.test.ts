@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getGoogleApiKey, setGoogleApiKey } from "./storage";
+import { clearAuthToken, getAuthToken, getGoogleApiKey, setAuthToken, setGoogleApiKey } from "./storage";
 
 // jsdom's built-in localStorage is unreliable under some Node versions in
 // this environment, so we stub it ourselves (same pattern as fetch mocking
@@ -44,5 +44,30 @@ describe("google api key storage", () => {
     setGoogleApiKey("AIzaSomeKey");
     setGoogleApiKey("");
     expect(getGoogleApiKey()).toBe("");
+  });
+});
+
+describe("auth token storage", () => {
+  beforeEach(() => {
+    vi.stubGlobal("localStorage", fakeLocalStorage());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns null when nothing stored", () => {
+    expect(getAuthToken()).toBeNull();
+  });
+
+  it("persists and reads back a token", () => {
+    setAuthToken("my-token");
+    expect(getAuthToken()).toBe("my-token");
+  });
+
+  it("clears the token", () => {
+    setAuthToken("my-token");
+    clearAuthToken();
+    expect(getAuthToken()).toBeNull();
   });
 });

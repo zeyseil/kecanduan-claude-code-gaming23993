@@ -74,20 +74,32 @@ vi.mock("@datastax/astra-db-ts", () => {
 
 const { default: app } = await import("../index");
 
+const fakeTokens = new Map([["test-token", "demo-user"]]);
+
 const testEnv = {
   ASTRA_DB_API_ENDPOINT: "https://fake.apps.astra.datastax.com",
   ASTRA_DB_APPLICATION_TOKEN: "fake-token",
   ASTRA_DB_COLLECTION: "comics",
+  AUTH_TOKENS: { get: async (key: string) => fakeTokens.get(key) ?? null },
 };
 
 function request(input: string, init?: RequestInit) {
-  return app.request(input, init, testEnv);
+  return app.request(
+    input,
+    { ...init, headers: { ...init?.headers, Authorization: "Bearer test-token" } },
+    testEnv,
+  );
 }
 
 describe("/comics", () => {
   beforeEach(() => {
     documents = [];
     shouldFailWrite = false;
+  });
+
+  it("rejects requests without a valid Authorization token", async () => {
+    const res = await app.request("/comics", {}, testEnv);
+    expect(res.status).toBe(401);
   });
 
   it("lists no comics initially", async () => {

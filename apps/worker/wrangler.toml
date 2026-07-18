@@ -9,3 +9,10 @@ class_name = "RateLimiter"
 [[migrations]]
 tag = "v1"
 new_classes = ["RateLimiter"]
+
+# Token -> user_id lookup for browser-facing auth. Create your own namespace
+# with `wrangler kv namespace create AUTH_TOKENS` and paste its id below —
+# see apps/worker/README.md for provisioning tokens.
+[[kv_namespaces]]
+binding = "AUTH_TOKENS"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"

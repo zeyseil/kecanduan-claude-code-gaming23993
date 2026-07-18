@@ -1,4 +1,5 @@
 import type { Comic, TypeTag } from "../../types/comic";
+import { apiFetch } from "./client";
 
 const BASE_URL = import.meta.env.VITE_WORKER_URL ?? "http://localhost:8787";
 
@@ -21,7 +22,7 @@ export async function errorMessage(res: Response): Promise<string> {
 }
 
 export async function fetchComics(): Promise<Comic[]> {
-  const res = await fetch(`${BASE_URL}/comics`);
+  const res = await apiFetch(`${BASE_URL}/comics`);
   if (!res.ok) {
     throw new Error(await errorMessage(res));
   }
@@ -33,7 +34,7 @@ export type ComicPatch = Partial<
 >;
 
 export async function patchComic(id: string, patch: ComicPatch): Promise<Comic> {
-  const res = await fetch(`${BASE_URL}/comics/${id}`, {
+  const res = await apiFetch(`${BASE_URL}/comics/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
@@ -45,7 +46,7 @@ export async function patchComic(id: string, patch: ComicPatch): Promise<Comic> 
 }
 
 export async function deleteComic(id: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/comics/${id}`, { method: "DELETE" });
+  const res = await apiFetch(`${BASE_URL}/comics/${id}`, { method: "DELETE" });
   if (!res.ok) {
     throw new Error(await errorMessage(res));
   }
@@ -53,7 +54,7 @@ export async function deleteComic(id: string): Promise<void> {
 
 export async function postComic(input: NewComicInput): Promise<Comic> {
   // Entry manual selalu berstatus ongoing — lihat aturan lama di createComic.ts.
-  const res = await fetch(`${BASE_URL}/comics`, {
+  const res = await apiFetch(`${BASE_URL}/comics`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...input, status: "ongoing" }),

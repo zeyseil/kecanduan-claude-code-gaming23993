@@ -3,9 +3,7 @@ import type { Env } from "../env";
 import type { Comic, Status, TypeTag } from "../types/comic";
 import { TYPE_TAGS, STATUSES } from "../types/comic";
 import { getComicStore } from "../store/comicStore";
-
-// Auth is deferred — every request acts on this fixed demo user.
-const DEMO_USER_ID = "demo-user";
+import { userAuth } from "../middleware/userAuth";
 
 interface CreateComicBody {
   title?: unknown;
@@ -42,11 +40,13 @@ function validateCreateBody(body: CreateComicBody): string | null {
   return null;
 }
 
-export const comics = new Hono<{ Bindings: Env }>();
+export const comics = new Hono<{ Bindings: Env; Variables: { userId: string } }>();
+
+comics.use("*", userAuth);
 
 comics.get("/", async (c) => {
   const store = getComicStore(c.env);
-  return c.json(await store.listComics(DEMO_USER_ID));
+  return c.json(await store.listComics(c.get("userId")));
 });
 
 comics.post("/", async (c) => {
@@ -72,7 +72,7 @@ comics.post("/", async (c) => {
 
   const store = getComicStore(c.env);
   try {
-    await store.insertComic(DEMO_USER_ID, comic);
+    await store.insertComic(c.get("userId"), comic);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return c.json({ error: `Gagal menyimpan komik: ${message}` }, 500);
@@ -83,7 +83,7 @@ comics.post("/", async (c) => {
 comics.patch("/:id", async (c) => {
   const store = getComicStore(c.env);
   const id = c.req.param("id");
-  if (!(await store.findComic(DEMO_USER_ID, id))) {
+  if (!(await store.findComic(c.get("userId"), id))) {
     return c.json({ error: "comic tidak ditemukan" }, 404);
   }
 
@@ -136,7 +136,7 @@ comics.patch("/:id", async (c) => {
   }
 
   try {
-    const updated = await store.updateComic(DEMO_USER_ID, id, patch);
+    const updated = await store.updateComic(c.get("userId"), id, patch);
     return c.json(updated);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -146,7 +146,7 @@ comics.patch("/:id", async (c) => {
 
 comics.delete("/:id", async (c) => {
   const store = getComicStore(c.env);
-  const deleted = await store.deleteComic(DEMO_USER_ID, c.req.param("id"));
+  const deleted = await store.deleteComic(c.get("userId"), c.req.param("id"));
   if (!deleted) {
     return c.json({ error: "comic tidak ditemukan" }, 404);
   }
