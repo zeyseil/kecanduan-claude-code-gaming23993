@@ -10,9 +10,11 @@ class_name = "RateLimiter"
 tag = "v1"
 new_classes = ["RateLimiter"]
 
-# Token -> user_id lookup for browser-facing auth. Create your own namespace
-# with `wrangler kv namespace create AUTH_TOKENS` and paste its id below —
-# see apps/worker/README.md for provisioning tokens.
+# Token -> user_id lookup for browser-facing auth. `id` = production namespace
+# (`wrangler kv namespace create AUTH_TOKENS`), `preview_id` = separate dev
+# namespace (`wrangler kv namespace create AUTH_TOKENS --preview`) required by
+# `wrangler dev --remote` (see apps/worker/README.md "Setup Auth").
 [[kv_namespaces]]
 binding = "AUTH_TOKENS"
-id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+id = "503fa9ce6c7446f78e50eb8845cbeac5"
+preview_id = "d39de01963b04b3bb1dc271e12697b59"
