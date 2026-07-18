@@ -23,12 +23,13 @@ Tanggung jawab:
   - `GET /comics` — daftar komik milik user
   - `POST /comics`, `PATCH /comics/:id` — create/update manual tanpa lewat AI (untuk edit langsung dari halaman visual)
 
-Skeleton kode Worker (Hono) belum ditulis — kontrak endpoint tool internal (dipanggil Langflow) sudah didesain di `TOOL_CONTRACTS.md`, hidup di Worker yang sama di bawah path `/internal/tools/*`.
+Worker (Hono) mengimplementasi endpoint di atas; tool AI hidup sebagai fungsi in-process di Worker yang sama (`apps/worker/src/agent/tools.ts`), bukan endpoint HTTP terpisah — lihat `TOOL_CONTRACTS.md`.
 
-## 4. Peran Langflow
-- Menerima teks bebas lewat `/run`, dengan `tweaks` berisi API key Gemini milik user yang sedang request
-- Agent (Google Generative AI, tool calling enabled) mengekstrak entitas dan memanggil tool — lihat detail di `LANGFLOW_FLOW.md`
-- Tool-tool memanggil endpoint aplikasi existing (belum diinventarisasi — lihat Open Questions)
+## 4. Orkestrasi AI (di dalam Worker)
+- `/agent/process` menerima teks bebas + API key Gemini milik user yang sedang request
+- Worker memanggil **Gemini function calling** langsung (`apps/worker/src/agent/`): model mengekstrak entitas dan memilih tool, Worker mengeksekusinya in-process lalu mengumpankan hasilnya balik sampai model membalas teks
+- Nilai berbatas (`type_tag`, `status`, `ai_action`) dideklarasikan sebagai `enum` di schema fungsi, jadi ditegakkan API — bukan diminta lewat teks prompt
+- Orkestrasi sebelumnya memakai Langflow sebagai layanan terpisah; diarsipkan di branch `archive/langflow-orchestration` (alasan penggantian ada di `TOOL_CONTRACTS.md`)
 
 ## 5. Data Model (draft, gaya Astra DB / Cassandra)
 

@@ -11,21 +11,11 @@ ASTRA_DB_COLLECTION=comics
 # `pnpm --filter worker run create-collection`.
 PROCESS_LOG_COLLECTION=process_log
 
-# Secret statis yang harus dikirim tiap request ke /internal/tools/* lewat
-# header X-Internal-Secret. Isi dengan string acak sendiri (mis. `openssl rand
-# -hex 32`) — nilai yang sama harus dikonfigurasi di tiap Tool component
-# Langflow (tweaks, bukan diisi LLM).
-INTERNAL_TOOLS_SECRET=ganti-dengan-secret-acak-mu
+# (Opsional) Override model Gemini yang dipakai AI agent. Kalau dikosongkan,
+# Worker memakai default di src/agent/geminiClient.ts. Isi kalau Google
+# mengganti/menghentikan nama model itu, atau kalau mau coba model lain.
+# GEMINI_MODEL=gemini-3.5-flash
 
-# Endpoint /run instance Langflow-mu (dari DataStax Langflow atau self-hosted)
-# dan API key untuk autentikasi ke Langflow itu sendiri — beda dari
-# google_api_key milik user yang dikirim per-request.
-LANGFLOW_API_URL=https://<langflow-host>/api/v1/run/<flow-id>
-LANGFLOW_API_KEY=xxxxxxxx
-
-# (Opsional) URL health endpoint Langflow, di-ping tiap 30 menit oleh cron
-# trigger Worker. Langflow jalan di VM Oracle Cloud Always Free yang tidak
-# pernah sleep, jadi ini murni monitoring uptime ringan, bukan keep-alive
-# wajib. Kalau Langflow jalan lokal, kosongkan saja — handler scheduled akan
-# no-op. Contoh: https://langflow.domain-anda.com/health
-LANGFLOW_HEALTH_URL=https://langflow.domain-anda.com/health
+# CATATAN: tidak ada secret Langflow di sini lagi. Orkestrasi AI sekarang jalan
+# di dalam Worker (src/agent/), memanggil Gemini langsung dengan API key milik
+# user yang dikirim per-request — tidak pernah disimpan di server.

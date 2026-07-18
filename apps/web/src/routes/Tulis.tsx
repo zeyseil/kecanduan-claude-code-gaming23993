@@ -1,15 +1,14 @@
 import { useState } from "react";
 import { TextEditor } from "../components/TextEditor";
-import { processAgentText } from "../lib/api/agent";
+import { processAgentText, type AgentResult } from "../lib/api/agent";
 import { getGoogleApiKey, setGoogleApiKey } from "../lib/storage";
-import { extractAgentMessage } from "../lib/parseAgentResult";
 
 type Status = "idle" | "processing" | "success" | "error";
 
 export function Tulis() {
   const [apiKey, setApiKey] = useState(() => getGoogleApiKey());
   const [status, setStatus] = useState<Status>("idle");
-  const [result, setResult] = useState<unknown>(null);
+  const [result, setResult] = useState<AgentResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleApiKeyChange = (value: string) => {
@@ -88,17 +87,16 @@ export function Tulis() {
           <p className="mb-1 text-xs uppercase tracking-wide text-slate-400">
             Hasil dari AI agent
           </p>
-          {extractAgentMessage(result) ? (
-            <p className="text-sm text-slate-100">{extractAgentMessage(result)}</p>
+          {result.message ? (
+            <p className="text-sm text-slate-100">{result.message}</p>
           ) : (
             <p className="text-sm text-slate-400">
-              Tidak bisa membaca ringkasan balasan (bentuk respons tidak dikenal) — lihat detail
-              JSON di bawah.
+              AI tidak mengembalikan ringkasan teks — lihat detail langkah di bawah.
             </p>
           )}
           <details className="mt-2">
             <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-400">
-              Lihat detail JSON
+              Lihat detail langkah ({result.tool_calls.length} tool dipanggil)
             </summary>
             <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-slate-300">
               {JSON.stringify(result, null, 2)}

@@ -8,8 +8,7 @@ Proyek ini masih greenfield — belum ada implementasi kode. Dokumen keputusan p
 
 - [`PRD.md`](PRD.md) — latar belakang, tujuan produk, dan daftar fitur
 - [`SPEC.md`](SPEC.md) — spesifikasi teknis
-- [`LANGFLOW_FLOW.md`](LANGFLOW_FLOW.md) — alur orkestrasi AI agent
-- [`TOOL_CONTRACTS.md`](TOOL_CONTRACTS.md) — kontrak tool untuk agent AI
+- [`TOOL_CONTRACTS.md`](TOOL_CONTRACTS.md) — kontrak tool + alur orkestrasi AI agent
 - [`CLAUDE.md`](CLAUDE.md) — konteks kerja untuk Claude Code, termasuk prinsip desain yang sudah diputuskan
 
 ## Stack
