@@ -83,7 +83,7 @@ describe("/agent/process", () => {
       internal_secret: "test-secret",
       app_user_id: "demo-user",
     });
-    expect(sentBody.tweaks["CustomComponent-REPLACE-ME-set-cover"]).toEqual({
+    expect(sentBody.tweaks["CustomComponent-okkfJ"]).toEqual({
       internal_secret: "test-secret",
       app_user_id: "demo-user",
     });

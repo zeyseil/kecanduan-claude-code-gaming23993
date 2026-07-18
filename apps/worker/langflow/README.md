@@ -25,7 +25,7 @@ Chat Input --> Agent (Google Generative AI, tool calling) --> Chat Output
 | `CustomComponent-Dn6gI` | update_chapter |
 | `CustomComponent-TiPBs` | cari_cover_mangadex |
 | `CustomComponent-XuCo4` | log_proses |
-| `CustomComponent-REPLACE-ME-set-cover` | set_cover — **PLACEHOLDER**, belum ada node-nya. Setelah Anda bikin node baru di Langflow (§6 di bawah), salin id sungguhan yang Langflow assign (lihat URL/panel node) dan tempel ke `TOOL_COMPONENT_IDS` di `apps/worker/src/routes/agent.ts` menggantikan placeholder ini — kalau lupa, tweaks `internal_secret`/`app_user_id` tidak akan sampai ke node itu (diam-diam gagal, bukan error jelas). |
+| `CustomComponent-okkfJ` | set_cover |
 
 ## Tweaks yang dikirim tiap run (dari `agent.ts`)
 
@@ -317,6 +317,6 @@ Ditemukan lewat testing nyata: `cari_cover_mangadex` cuma mencari `cover_url`, t
 1. Di Langflow UI, buka flow "yay" (project "komik-tracker"), buat **Custom Component** baru, tempel kode `SetCoverTool` (§5 di atas).
 2. Cek toolbar node (**"Tool Mode"**) otomatis aktif (lihat catatan Tool Mode di atas), sambungkan output **"Toolset"**-nya ke input "Tools" milik node Agent (sama seperti 5 tool lain).
 3. Isi field `worker_base_url` (default `http://localhost:8787`, sesuaikan) dan `internal_secret` node baru ini sama seperti node lain.
-4. Salin `id` node baru yang di-assign Langflow (klik node → lihat panel/id di kanan, atau lihat network request saat save flow), tempel ke `TOOL_COMPONENT_IDS` di `apps/worker/src/routes/agent.ts` menggantikan placeholder `"CustomComponent-REPLACE-ME-set-cover"`.
+4. Salin `id` node baru yang di-assign Langflow (klik node → lihat panel/id di kanan, atau lihat network request saat save flow), tempel ke `TOOL_COMPONENT_IDS` di `apps/worker/src/routes/agent.ts` — **sudah dilakukan**, id node `set_cover` di flow "yay" adalah `CustomComponent-okkfJ` (lihat tabel Component ids di atas).
 5. Update system prompt Agent sungguhan di Langflow UI sesuai aturan baru di §"System prompt untuk Agent" di atas (poin 2, sub-bullet "Tidak ada kandidat...") — Agent harus tahu untuk memanggil `set_cover` setelah `cari_cover_mangadex` sukses.
 6. Redeploy/restart Worker (kalau `agent.ts` berubah), lalu test ulang alur buat komik baru sampai tuntas — cek Astra `comics` collection, `cover_url` harus terisi setelah run selesai (bukan lagi kosong).
