@@ -72,7 +72,7 @@ vi.mock("@datastax/astra-db-ts", () => {
   return { DataAPIClient };
 });
 
-const { default: app } = await import("../index");
+const { app } = await import("../index");
 
 const fakeTokens = new Map([["test-token", "demo-user"]]);
 

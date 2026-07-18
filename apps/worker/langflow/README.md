@@ -1,5 +1,7 @@
 # Langflow flow — Comic Tracker Agent
 
+> **Catatan:** `comic-tracker-flow.json` masih memuat `worker_base_url`/`internal_secret` sebagai nilai literal (pola lama sebelum secret dipindah ke env). Kalau Anda tetap memakainya, kosongkan dua field itu di tiap node setelah import supaya jatuh ke `os.getenv(...)` — atau (disarankan) bangun manual dari kode Python di bawah yang sudah env-based. Lihat juga `HF_DEPLOY.md` untuk deploy Langflow ke Hugging Face Spaces.
+
 `comic-tracker-flow.json` adalah **scaffold best-effort**, bukan jaminan siap-import 100%. Skema JSON internal Langflow (field `template` tiap node) berubah antar versi dan saya tidak punya akses ke instance Langflow nyata untuk verifikasi langsung. Import file ini ke Langflow Anda dulu (menu **Import** di halaman flow) — kalau ada error field/komponen, opsi termudah adalah membangun ulang node yang gagal secara manual di UI Langflow memakai kode & konfigurasi di bawah ini, lalu re-connect edge sesuai graph di `LANGFLOW_FLOW.md`.
 
 ## Graph
@@ -30,9 +32,11 @@ Chat Input --> Agent (Google Generative AI, tool calling) --> Chat Output
 ## Tweaks yang dikirim tiap run (dari `agent.ts`)
 
 - `Agent-gemini` → `{ api_key: <google_api_key milik user, per-request, tidak disimpan> }`
-- Tiap `Tool-*` → `{ internal_secret: <INTERNAL_TOOLS_SECRET>, app_user_id: "demo-user" }`
+- Tiap `Tool-*` → `{ app_user_id: <user_id dari token, per-request> }`
 
-**Field `worker_base_url` pada tiap Tool component TIDAK di-tweak** (nilainya sama di semua run) — set sekali secara manual di UI Langflow ke URL publik Worker Anda (mis. `https://komik-tracker-worker.<subdomain>.workers.dev`, atau `http://localhost:8787` untuk testing lokal kalau Langflow Anda bisa menjangkau localhost Worker).
+**`internal_secret` dan `worker_base_url` TIDAK lagi di-tweak dari Worker.** Sejak Langflow dipindah ke Hugging Face Spaces, dua nilai ini dibaca oleh tiap Tool component dari **environment variable** Langflow (`os.getenv("INTERNAL_TOOLS_SECRET")` / `os.getenv("WORKER_BASE_URL")`) — di HF diisi lewat **Space Secrets** (env var terenkripsi), bukan hardcode di JSON flow maupun diketik manual di tiap node. Ini menghindari secret bocor kalau flow di-export/JSON-nya terlihat. Field input `internal_secret`/`worker_base_url` tetap ada sebagai **override opsional** (kalau diisi, dipakai; kalau kosong, jatuh ke env). Untuk dev lokal tanpa HF, set env `WORKER_BASE_URL=http://localhost:8787` dan `INTERNAL_TOOLS_SECRET=<secret>` sebelum menjalankan `langflow run` (atau isi field override-nya).
+
+`app_user_id` **tetap** lewat tweaks per-request (nilainya beda per user, tidak boleh jadi env). `api_key` Google juga tetap per-request, tidak pernah disimpan.
 
 ## System prompt untuk Agent (field `instructions`/`system_prompt`)
 
@@ -73,6 +77,8 @@ Setelah paste kode, cek toolbar node (tombol **"Tool Mode"** di pojok kanan atas
 ### 1. cari_komik_mirip → `Tool-find-similar`
 
 ```python
+import os
+
 import httpx
 from langflow.custom import Component
 from langflow.io import StrInput, Output
@@ -89,18 +95,24 @@ class FindSimilarTool(Component):
 
     inputs = [
         StrInput(name="candidate_title", display_name="Judul Kandidat", required=True, tool_mode=True),
-        StrInput(name="worker_base_url", display_name="Worker Base URL",
-                 value="http://localhost:8787", advanced=True),
-        StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
+        # Kosongkan value — default dibaca dari env WORKER_BASE_URL / INTERNAL_TOOLS_SECRET
+        # (di HF Spaces: Space Secrets). Isi field ini hanya kalau mau override.
+        StrInput(name="worker_base_url", display_name="Worker Base URL (override; default dari env)",
+                 value="", advanced=True),
+        StrInput(name="internal_secret", display_name="Internal Secret (override; default dari env)",
+                 value="", advanced=True),
         StrInput(name="app_user_id", display_name="App User Id", value="demo-user", advanced=True),
     ]
     outputs = [Output(display_name="Kandidat", name="candidates", method="run")]
 
     def run(self) -> Data:
+        # Override field kalau diisi, kalau tidak baca dari env (HF Space Secrets).
+        base_url = self.worker_base_url or os.getenv("WORKER_BASE_URL", "http://localhost:8787")
+        secret = self.internal_secret or os.getenv("INTERNAL_TOOLS_SECRET", "")
         res = httpx.post(
-            f"{self.worker_base_url}/internal/tools/find-similar",
+            f"{base_url}/internal/tools/find-similar",
             json={"candidate_title": self.candidate_title},
-            headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.app_user_id},
+            headers={"X-Internal-Secret": secret, "X-User-Id": self.app_user_id},
             timeout=10,
         )
         res.raise_for_status()
@@ -110,6 +122,8 @@ class FindSimilarTool(Component):
 ### 2. buat_entry_baru → `Tool-create-comic`
 
 ```python
+import os
+
 import httpx
 from langflow.custom import Component
 from langflow.io import StrInput, BoolInput, FloatInput, Output
@@ -127,16 +141,22 @@ class CreateComicTool(Component):
         BoolInput(name="is_adult", display_name="Is Adult", required=True, tool_mode=True),
         FloatInput(name="chapter", display_name="Chapter", required=True, tool_mode=True),
         StrInput(name="comic_status", display_name="Status: HARUS persis 'ongoing' atau 'completed', atau kosongkan", value="", tool_mode=True, advanced=True),
-        StrInput(name="worker_base_url", display_name="Worker Base URL",
-                 value="http://localhost:8787", advanced=True),
-        StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
+        # Kosongkan value — default dibaca dari env WORKER_BASE_URL / INTERNAL_TOOLS_SECRET
+        # (di HF Spaces: Space Secrets). Isi field ini hanya kalau mau override.
+        StrInput(name="worker_base_url", display_name="Worker Base URL (override; default dari env)",
+                 value="", advanced=True),
+        StrInput(name="internal_secret", display_name="Internal Secret (override; default dari env)",
+                 value="", advanced=True),
         StrInput(name="app_user_id", display_name="App User Id", value="demo-user", advanced=True),
     ]
     outputs = [Output(display_name="Hasil", name="result", method="run")]
 
     def run(self) -> Data:
+        # Override field kalau diisi, kalau tidak baca dari env (HF Space Secrets).
+        base_url = self.worker_base_url or os.getenv("WORKER_BASE_URL", "http://localhost:8787")
+        secret = self.internal_secret or os.getenv("INTERNAL_TOOLS_SECRET", "")
         res = httpx.post(
-            f"{self.worker_base_url}/internal/tools/create-comic",
+            f"{base_url}/internal/tools/create-comic",
             json={
                 "title": self.title,
                 "type_tag": self.type_tag,
@@ -144,7 +164,7 @@ class CreateComicTool(Component):
                 "chapter": self.chapter,
                 "status": self.comic_status or None,
             },
-            headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.app_user_id},
+            headers={"X-Internal-Secret": secret, "X-User-Id": self.app_user_id},
             timeout=10,
         )
         res.raise_for_status()
@@ -154,6 +174,8 @@ class CreateComicTool(Component):
 ### 3. update_chapter → `Tool-update-chapter`
 
 ```python
+import os
+
 import httpx
 from langflow.custom import Component
 from langflow.io import StrInput, FloatInput, Output
@@ -169,18 +191,24 @@ class UpdateChapterTool(Component):
         StrInput(name="comic_id", display_name="Comic Id", required=True, tool_mode=True),
         FloatInput(name="chapter", display_name="Chapter", required=True, tool_mode=True),
         StrInput(name="comic_status", display_name="Status: HARUS persis 'ongoing' atau 'completed', atau kosongkan", value="", tool_mode=True, advanced=True),
-        StrInput(name="worker_base_url", display_name="Worker Base URL",
-                 value="http://localhost:8787", advanced=True),
-        StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
+        # Kosongkan value — default dibaca dari env WORKER_BASE_URL / INTERNAL_TOOLS_SECRET
+        # (di HF Spaces: Space Secrets). Isi field ini hanya kalau mau override.
+        StrInput(name="worker_base_url", display_name="Worker Base URL (override; default dari env)",
+                 value="", advanced=True),
+        StrInput(name="internal_secret", display_name="Internal Secret (override; default dari env)",
+                 value="", advanced=True),
         StrInput(name="app_user_id", display_name="App User Id", value="demo-user", advanced=True),
     ]
     outputs = [Output(display_name="Hasil", name="result", method="run")]
 
     def run(self) -> Data:
+        # Override field kalau diisi, kalau tidak baca dari env (HF Space Secrets).
+        base_url = self.worker_base_url or os.getenv("WORKER_BASE_URL", "http://localhost:8787")
+        secret = self.internal_secret or os.getenv("INTERNAL_TOOLS_SECRET", "")
         res = httpx.post(
-            f"{self.worker_base_url}/internal/tools/update-chapter",
+            f"{base_url}/internal/tools/update-chapter",
             json={"comic_id": self.comic_id, "chapter": self.chapter, "status": self.comic_status or None},
-            headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.app_user_id},
+            headers={"X-Internal-Secret": secret, "X-User-Id": self.app_user_id},
             timeout=10,
         )
         res.raise_for_status()
@@ -190,6 +218,8 @@ class UpdateChapterTool(Component):
 ### 4. cari_cover_mangadex → `Tool-fetch-cover`
 
 ```python
+import os
+
 import httpx
 from langflow.custom import Component
 from langflow.io import StrInput, Output
@@ -203,18 +233,24 @@ class FetchCoverTool(Component):
 
     inputs = [
         StrInput(name="title", display_name="Judul", required=True, tool_mode=True),
-        StrInput(name="worker_base_url", display_name="Worker Base URL",
-                 value="http://localhost:8787", advanced=True),
-        StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
+        # Kosongkan value — default dibaca dari env WORKER_BASE_URL / INTERNAL_TOOLS_SECRET
+        # (di HF Spaces: Space Secrets). Isi field ini hanya kalau mau override.
+        StrInput(name="worker_base_url", display_name="Worker Base URL (override; default dari env)",
+                 value="", advanced=True),
+        StrInput(name="internal_secret", display_name="Internal Secret (override; default dari env)",
+                 value="", advanced=True),
         StrInput(name="app_user_id", display_name="App User Id", value="demo-user", advanced=True),
     ]
     outputs = [Output(display_name="Hasil", name="result", method="run")]
 
     def run(self) -> Data:
+        # Override field kalau diisi, kalau tidak baca dari env (HF Space Secrets).
+        base_url = self.worker_base_url or os.getenv("WORKER_BASE_URL", "http://localhost:8787")
+        secret = self.internal_secret or os.getenv("INTERNAL_TOOLS_SECRET", "")
         res = httpx.post(
-            f"{self.worker_base_url}/internal/tools/fetch-cover",
+            f"{base_url}/internal/tools/fetch-cover",
             json={"title": self.title},
-            headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.app_user_id},
+            headers={"X-Internal-Secret": secret, "X-User-Id": self.app_user_id},
             timeout=10,
         )
         res.raise_for_status()
@@ -224,6 +260,8 @@ class FetchCoverTool(Component):
 ### 5. set_cover → `Tool-set-cover` (BARU — belum ada node-nya, bikin manual)
 
 ```python
+import os
+
 import httpx
 from langflow.custom import Component
 from langflow.io import StrInput, Output
@@ -242,18 +280,24 @@ class SetCoverTool(Component):
     inputs = [
         StrInput(name="comic_id", display_name="Comic Id", required=True, tool_mode=True),
         StrInput(name="cover_url", display_name="Cover URL", required=True, tool_mode=True),
-        StrInput(name="worker_base_url", display_name="Worker Base URL",
-                 value="http://localhost:8787", advanced=True),
-        StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
+        # Kosongkan value — default dibaca dari env WORKER_BASE_URL / INTERNAL_TOOLS_SECRET
+        # (di HF Spaces: Space Secrets). Isi field ini hanya kalau mau override.
+        StrInput(name="worker_base_url", display_name="Worker Base URL (override; default dari env)",
+                 value="", advanced=True),
+        StrInput(name="internal_secret", display_name="Internal Secret (override; default dari env)",
+                 value="", advanced=True),
         StrInput(name="app_user_id", display_name="App User Id", value="demo-user", advanced=True),
     ]
     outputs = [Output(display_name="Hasil", name="result", method="run")]
 
     def run(self) -> Data:
+        # Override field kalau diisi, kalau tidak baca dari env (HF Space Secrets).
+        base_url = self.worker_base_url or os.getenv("WORKER_BASE_URL", "http://localhost:8787")
+        secret = self.internal_secret or os.getenv("INTERNAL_TOOLS_SECRET", "")
         res = httpx.post(
-            f"{self.worker_base_url}/internal/tools/set-cover",
+            f"{base_url}/internal/tools/set-cover",
             json={"comic_id": self.comic_id, "cover_url": self.cover_url},
-            headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.app_user_id},
+            headers={"X-Internal-Secret": secret, "X-User-Id": self.app_user_id},
             timeout=10,
         )
         res.raise_for_status()
@@ -263,6 +307,8 @@ class SetCoverTool(Component):
 ### 6. log_proses → `Tool-log-process`
 
 ```python
+import os
+
 import httpx
 from langflow.custom import Component
 from langflow.io import StrInput, BoolInput, Output
@@ -280,23 +326,29 @@ class LogProcessTool(Component):
         StrInput(name="target_comic_id", display_name="Target Comic Id (kosong kalau ambiguous)",
                   value="", tool_mode=True, advanced=True),
         BoolInput(name="confirmed", display_name="Confirmed", required=True, tool_mode=True),
-        StrInput(name="worker_base_url", display_name="Worker Base URL",
-                 value="http://localhost:8787", advanced=True),
-        StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
+        # Kosongkan value — default dibaca dari env WORKER_BASE_URL / INTERNAL_TOOLS_SECRET
+        # (di HF Spaces: Space Secrets). Isi field ini hanya kalau mau override.
+        StrInput(name="worker_base_url", display_name="Worker Base URL (override; default dari env)",
+                 value="", advanced=True),
+        StrInput(name="internal_secret", display_name="Internal Secret (override; default dari env)",
+                 value="", advanced=True),
         StrInput(name="app_user_id", display_name="App User Id", value="demo-user", advanced=True),
     ]
     outputs = [Output(display_name="Hasil", name="result", method="run")]
 
     def run(self) -> Data:
+        # Override field kalau diisi, kalau tidak baca dari env (HF Space Secrets).
+        base_url = self.worker_base_url or os.getenv("WORKER_BASE_URL", "http://localhost:8787")
+        secret = self.internal_secret or os.getenv("INTERNAL_TOOLS_SECRET", "")
         res = httpx.post(
-            f"{self.worker_base_url}/internal/tools/log-process",
+            f"{base_url}/internal/tools/log-process",
             json={
                 "input_text": self.input_text,
                 "ai_action": self.ai_action,
                 "target_comic_id": self.target_comic_id or None,
                 "confirmed": self.confirmed,
             },
-            headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.app_user_id},
+            headers={"X-Internal-Secret": secret, "X-User-Id": self.app_user_id},
             timeout=10,
         )
         res.raise_for_status()
@@ -306,7 +358,7 @@ class LogProcessTool(Component):
 ## Verifikasi setelah import
 
 1. Buka flow di Langflow UI, cek graph: Chat Input → Agent → Chat Output, dan 6 Tool node terhubung ke input "Tools" milik Agent.
-2. Isi field `worker_base_url` di keenam Tool node (default `http://localhost:8787`, ganti kalau Worker Anda di URL lain).
+2. Pastikan env `WORKER_BASE_URL` dan `INTERNAL_TOOLS_SECRET` tersedia untuk Langflow (di HF: Space Secrets; lokal: export sebelum `langflow run`). Field `worker_base_url`/`internal_secret` di node dibiarkan kosong — dibaca dari env. Isi field-nya HANYA kalau mau override sementara.
 3. Salin `id` flow dari URL Langflow (`.../flow/<flow-id>`), pasang ke `LANGFLOW_API_URL` di `.dev.vars` sebagai `https://<langflow-host>/api/v1/run/<flow-id>`.
 4. Test langsung di UI Langflow (Playground) dulu dengan input teks contoh, sebelum test lewat `/agent/process` di Worker.
 
