@@ -13,16 +13,16 @@ Chat Input --> Agent (Google Generative AI, tool calling) --> Chat Output
 
 ## Component ids (penting — harus sama persis dengan `apps/worker/src/routes/agent.ts`)
 
-`agent.ts` mengirim `tweaks` per-run ke Langflow, di-target lewat id komponen berikut. Kalau Anda mengedit/membangun ulang node manual di UI dan id-nya berubah, **update `AGENT_COMPONENT_ID`/`TOOL_COMPONENT_IDS` di `agent.ts` supaya tetap sinkron**:
+`agent.ts` mengirim `tweaks` per-run ke Langflow, di-target lewat id komponen berikut. Ini adalah id NYATA dari flow "yay" (project "komik-tracker") yang dibangun manual di UI — Langflow assign random suffix per node, jadi id ini TIDAK stabil kalau flow dibangun ulang dari nol. Kalau Anda rebuild/rename node dan id berubah, **update `AGENT_COMPONENT_ID`/`TOOL_COMPONENT_IDS` di `agent.ts` (dan test-nya di `agent.test.ts`) supaya tetap sinkron**:
 
 | Component id | Peran |
 |---|---|
-| `Agent-gemini` | Node Agent (Google Generative AI, tool calling) |
-| `Tool-find-similar` | cari_komik_mirip |
-| `Tool-create-comic` | buat_entry_baru |
-| `Tool-update-chapter` | update_chapter |
-| `Tool-fetch-cover` | cari_cover_mangadex |
-| `Tool-log-process` | log_proses |
+| `Agent-UVDzm` | Node Agent (Google Generative AI, tool calling) |
+| `CustomComponent-zI7yQ` | cari_komik_mirip |
+| `CustomComponent-urIVs` | buat_entry_baru |
+| `CustomComponent-Dn6gI` | update_chapter |
+| `CustomComponent-TiPBs` | cari_cover_mangadex |
+| `CustomComponent-XuCo4` | log_proses |
 
 ## Tweaks yang dikirim tiap run (dari `agent.ts`)
 

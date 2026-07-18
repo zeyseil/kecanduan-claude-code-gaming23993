@@ -13,15 +13,18 @@ interface AgentProcessBody {
 
 export const agent = new Hono<{ Bindings: Env }>();
 
-// Component ids referenced here must match langflow/comic-tracker-flow.json —
-// they're how `tweaks` targets specific nodes in the imported flow.
-const AGENT_COMPONENT_ID = "Agent-gemini";
+// Component ids referenced here must match the actual node ids in the user's
+// Langflow flow ("komik-tracker" project, flow "yay") — they're how `tweaks`
+// targets specific nodes. Langflow assigns a random suffix per node, so these
+// are NOT stable across a from-scratch rebuild; update here if the flow is
+// ever rebuilt. See langflow/README.md.
+const AGENT_COMPONENT_ID = "Agent-UVDzm";
 const TOOL_COMPONENT_IDS = [
-  "Tool-find-similar",
-  "Tool-create-comic",
-  "Tool-update-chapter",
-  "Tool-fetch-cover",
-  "Tool-log-process",
+  "CustomComponent-zI7yQ", // cari_komik_mirip
+  "CustomComponent-urIVs", // buat_entry_baru
+  "CustomComponent-Dn6gI", // update_chapter
+  "CustomComponent-TiPBs", // cari_cover_mangadex
+  "CustomComponent-XuCo4", // log_proses
 ] as const;
 
 agent.post("/process", async (c) => {

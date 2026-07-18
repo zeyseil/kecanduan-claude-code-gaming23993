@@ -61,8 +61,8 @@ describe("/agent/process", () => {
 
     const sentBody = JSON.parse((init as RequestInit).body as string);
     expect(sentBody.input_value).toBe("baru baca monster ch33");
-    expect(sentBody.tweaks["Agent-gemini"]).toEqual({ api_key: "gk-1" });
-    expect(sentBody.tweaks["Tool-find-similar"]).toEqual({
+    expect(sentBody.tweaks["Agent-UVDzm"]).toEqual({ api_key: "gk-1" });
+    expect(sentBody.tweaks["CustomComponent-zI7yQ"]).toEqual({
       internal_secret: "test-secret",
       user_id: "demo-user",
     });
