@@ -24,7 +24,8 @@ LANGFLOW_API_URL=https://<langflow-host>/api/v1/run/<flow-id>
 LANGFLOW_API_KEY=xxxxxxxx
 
 # (Opsional) URL health endpoint Langflow, di-ping tiap 30 menit oleh cron
-# trigger Worker supaya Hugging Face Space tidak tidur (free tier tidur setelah
-# ~48 jam idle). Kalau Langflow jalan lokal, kosongkan saja — handler scheduled
-# akan no-op. Contoh HF: https://<user>-<space>.hf.space/health
-LANGFLOW_HEALTH_URL=https://<user>-<space>.hf.space/health
+# trigger Worker. Langflow jalan di VM Oracle Cloud Always Free yang tidak
+# pernah sleep, jadi ini murni monitoring uptime ringan, bukan keep-alive
+# wajib. Kalau Langflow jalan lokal, kosongkan saja — handler scheduled akan
+# no-op. Contoh: https://langflow.domain-anda.com/health
+LANGFLOW_HEALTH_URL=https://langflow.domain-anda.com/health

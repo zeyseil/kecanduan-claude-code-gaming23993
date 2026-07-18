@@ -48,8 +48,8 @@ wrangler secret put PROCESS_LOG_COLLECTION
 wrangler secret put INTERNAL_TOOLS_SECRET
 wrangler secret put LANGFLOW_API_URL
 wrangler secret put LANGFLOW_API_KEY
-# Opsional — keep-alive ping untuk Langflow di Hugging Face Spaces (lihat
-# langflow/HF_DEPLOY.md). Kosongkan kalau Langflow tidak di HF.
+# Opsional — monitoring uptime untuk Langflow di VM Oracle Cloud (lihat
+# langflow/ORACLE_DEPLOY.md). Kosongkan kalau Langflow jalan lokal.
 wrangler secret put LANGFLOW_HEALTH_URL
 ```
 

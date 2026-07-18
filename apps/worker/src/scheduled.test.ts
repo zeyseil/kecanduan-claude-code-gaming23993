@@ -33,9 +33,9 @@ describe("scheduled keep-alive", () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await worker.scheduled(event, makeEnv({ LANGFLOW_HEALTH_URL: "https://space.hf.space/health" }));
+    await worker.scheduled(event, makeEnv({ LANGFLOW_HEALTH_URL: "https://langflow.example.com/health" }));
 
-    expect(fetchMock).toHaveBeenCalledWith("https://space.hf.space/health", { method: "GET" });
+    expect(fetchMock).toHaveBeenCalledWith("https://langflow.example.com/health", { method: "GET" });
   });
 
   it("skips (no fetch) when LANGFLOW_HEALTH_URL is unset", async () => {
@@ -52,7 +52,7 @@ describe("scheduled keep-alive", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      worker.scheduled(event, makeEnv({ LANGFLOW_HEALTH_URL: "https://space.hf.space/health" })),
+      worker.scheduled(event, makeEnv({ LANGFLOW_HEALTH_URL: "https://langflow.example.com/health" })),
     ).resolves.toBeUndefined();
   });
 });

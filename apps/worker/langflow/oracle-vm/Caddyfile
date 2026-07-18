@@ -1,0 +1,12 @@
+# Ganti domain di bawah dengan domain/subdomain Anda yang sudah diarahkan
+# (DNS A record) ke IP publik VM Oracle. Caddy otomatis mengurus sertifikat
+# TLS lewat Let's Encrypt — tidak perlu setup manual.
+#
+# Kalau belum punya domain, ganti baris pertama dengan IP publik VM diikuti
+# `:443` dan tambahkan `tls internal` di bawahnya (sertifikat self-signed,
+# browser akan warning — cukup untuk testing, ganti ke domain asli untuk
+# pemakaian nyata karena Langflow API dipanggil Worker lewat HTTPS publik).
+
+langflow.contoh-domain-anda.com {
+	reverse_proxy langflow:7860
+}

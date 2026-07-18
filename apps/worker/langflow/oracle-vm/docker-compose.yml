@@ -1,0 +1,40 @@
+# Langflow di Oracle Cloud Always Free VM. Beda dari platform PaaS (HF/Koyeb):
+# di sini kita yang menjalankan `docker compose up -d` langsung di VM, bukan
+# platform yang build dari Dockerfile. Disk VM persisten sungguhan, tapi kita
+# tetap arahkan Langflow ke Postgres eksternal (Neon) — sudah terverifikasi
+# jalan, dan memisahkan data dari lifecycle VM.
+#
+# Salin folder ini ke VM (scp/git clone), isi `.env` di sebelah file ini
+# (JANGAN commit .env ke repo — lihat .env.example), lalu:
+#   docker compose up -d
+
+services:
+  langflow:
+    image: langflowai/langflow:latest
+    restart: always
+    env_file: .env
+    environment:
+      LANGFLOW_HOST: 0.0.0.0
+      LANGFLOW_PORT: "7860"
+    expose:
+      - "7860"
+    # Port 7860 SENGAJA tidak di-publish ke host — hanya Caddy yang boleh
+    # menjangkaunya (lihat Caddyfile), supaya Langflow tidak langsung
+    # ter-expose publik tanpa TLS.
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    depends_on:
+      - langflow
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

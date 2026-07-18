@@ -1,6 +1,6 @@
 # Langflow flow — Comic Tracker Agent
 
-> **Catatan:** `comic-tracker-flow.json` masih memuat `worker_base_url`/`internal_secret` sebagai nilai literal (pola lama sebelum secret dipindah ke env). Kalau Anda tetap memakainya, kosongkan dua field itu di tiap node setelah import supaya jatuh ke `os.getenv(...)` — atau (disarankan) bangun manual dari kode Python di bawah yang sudah env-based. Lihat juga `HF_DEPLOY.md` untuk deploy Langflow ke Hugging Face Spaces.
+> **Catatan:** `comic-tracker-flow.json` masih memuat `worker_base_url`/`internal_secret` sebagai nilai literal (pola lama sebelum secret dipindah ke env). Kalau Anda tetap memakainya, kosongkan dua field itu di tiap node setelah import supaya jatuh ke `os.getenv(...)` — atau (disarankan) bangun manual dari kode Python di bawah yang sudah env-based. Lihat juga `ORACLE_DEPLOY.md` untuk deploy Langflow ke Oracle Cloud Always Free VM.
 
 `comic-tracker-flow.json` adalah **scaffold best-effort**, bukan jaminan siap-import 100%. Skema JSON internal Langflow (field `template` tiap node) berubah antar versi dan saya tidak punya akses ke instance Langflow nyata untuk verifikasi langsung. Import file ini ke Langflow Anda dulu (menu **Import** di halaman flow) — kalau ada error field/komponen, opsi termudah adalah membangun ulang node yang gagal secara manual di UI Langflow memakai kode & konfigurasi di bawah ini, lalu re-connect edge sesuai graph di `LANGFLOW_FLOW.md`.
 
@@ -34,7 +34,7 @@ Chat Input --> Agent (Google Generative AI, tool calling) --> Chat Output
 - `Agent-gemini` → `{ api_key: <google_api_key milik user, per-request, tidak disimpan> }`
 - Tiap `Tool-*` → `{ app_user_id: <user_id dari token, per-request> }`
 
-**`internal_secret` dan `worker_base_url` TIDAK lagi di-tweak dari Worker.** Sejak Langflow dipindah ke Hugging Face Spaces, dua nilai ini dibaca oleh tiap Tool component dari **environment variable** Langflow (`os.getenv("INTERNAL_TOOLS_SECRET")` / `os.getenv("WORKER_BASE_URL")`) — di HF diisi lewat **Space Secrets** (env var terenkripsi), bukan hardcode di JSON flow maupun diketik manual di tiap node. Ini menghindari secret bocor kalau flow di-export/JSON-nya terlihat. Field input `internal_secret`/`worker_base_url` tetap ada sebagai **override opsional** (kalau diisi, dipakai; kalau kosong, jatuh ke env). Untuk dev lokal tanpa HF, set env `WORKER_BASE_URL=http://localhost:8787` dan `INTERNAL_TOOLS_SECRET=<secret>` sebelum menjalankan `langflow run` (atau isi field override-nya).
+**`internal_secret` dan `worker_base_url` TIDAK lagi di-tweak dari Worker.** Sejak Langflow dipindah ke VM Oracle Cloud, dua nilai ini dibaca oleh tiap Tool component dari **environment variable** Langflow (`os.getenv("INTERNAL_TOOLS_SECRET")` / `os.getenv("WORKER_BASE_URL")`) — diisi lewat file `.env` docker-compose di VM (lihat `oracle-vm/.env.example`), bukan hardcode di JSON flow maupun diketik manual di tiap node. Ini menghindari secret bocor kalau flow di-export/JSON-nya terlihat. Field input `internal_secret`/`worker_base_url` tetap ada sebagai **override opsional** (kalau diisi, dipakai; kalau kosong, jatuh ke env). Untuk dev lokal tanpa VM, set env `WORKER_BASE_URL=http://localhost:8787` dan `INTERNAL_TOOLS_SECRET=<secret>` sebelum menjalankan `langflow run` (atau isi field override-nya).
 
 `app_user_id` **tetap** lewat tweaks per-request (nilainya beda per user, tidak boleh jadi env). `api_key` Google juga tetap per-request, tidak pernah disimpan.
 
@@ -96,7 +96,7 @@ class FindSimilarTool(Component):
     inputs = [
         StrInput(name="candidate_title", display_name="Judul Kandidat", required=True, tool_mode=True),
         # Kosongkan value — default dibaca dari env WORKER_BASE_URL / INTERNAL_TOOLS_SECRET
-        # (di HF Spaces: Space Secrets). Isi field ini hanya kalau mau override.
+        # (di VM Oracle: file .env docker-compose). Isi field ini hanya kalau mau override.
         StrInput(name="worker_base_url", display_name="Worker Base URL (override; default dari env)",
                  value="", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret (override; default dari env)",
@@ -142,7 +142,7 @@ class CreateComicTool(Component):
         FloatInput(name="chapter", display_name="Chapter", required=True, tool_mode=True),
         StrInput(name="comic_status", display_name="Status: HARUS persis 'ongoing' atau 'completed', atau kosongkan", value="", tool_mode=True, advanced=True),
         # Kosongkan value — default dibaca dari env WORKER_BASE_URL / INTERNAL_TOOLS_SECRET
-        # (di HF Spaces: Space Secrets). Isi field ini hanya kalau mau override.
+        # (di VM Oracle: file .env docker-compose). Isi field ini hanya kalau mau override.
         StrInput(name="worker_base_url", display_name="Worker Base URL (override; default dari env)",
                  value="", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret (override; default dari env)",
@@ -192,7 +192,7 @@ class UpdateChapterTool(Component):
         FloatInput(name="chapter", display_name="Chapter", required=True, tool_mode=True),
         StrInput(name="comic_status", display_name="Status: HARUS persis 'ongoing' atau 'completed', atau kosongkan", value="", tool_mode=True, advanced=True),
         # Kosongkan value — default dibaca dari env WORKER_BASE_URL / INTERNAL_TOOLS_SECRET
-        # (di HF Spaces: Space Secrets). Isi field ini hanya kalau mau override.
+        # (di VM Oracle: file .env docker-compose). Isi field ini hanya kalau mau override.
         StrInput(name="worker_base_url", display_name="Worker Base URL (override; default dari env)",
                  value="", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret (override; default dari env)",
@@ -234,7 +234,7 @@ class FetchCoverTool(Component):
     inputs = [
         StrInput(name="title", display_name="Judul", required=True, tool_mode=True),
         # Kosongkan value — default dibaca dari env WORKER_BASE_URL / INTERNAL_TOOLS_SECRET
-        # (di HF Spaces: Space Secrets). Isi field ini hanya kalau mau override.
+        # (di VM Oracle: file .env docker-compose). Isi field ini hanya kalau mau override.
         StrInput(name="worker_base_url", display_name="Worker Base URL (override; default dari env)",
                  value="", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret (override; default dari env)",
@@ -281,7 +281,7 @@ class SetCoverTool(Component):
         StrInput(name="comic_id", display_name="Comic Id", required=True, tool_mode=True),
         StrInput(name="cover_url", display_name="Cover URL", required=True, tool_mode=True),
         # Kosongkan value — default dibaca dari env WORKER_BASE_URL / INTERNAL_TOOLS_SECRET
-        # (di HF Spaces: Space Secrets). Isi field ini hanya kalau mau override.
+        # (di VM Oracle: file .env docker-compose). Isi field ini hanya kalau mau override.
         StrInput(name="worker_base_url", display_name="Worker Base URL (override; default dari env)",
                  value="", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret (override; default dari env)",
@@ -327,7 +327,7 @@ class LogProcessTool(Component):
                   value="", tool_mode=True, advanced=True),
         BoolInput(name="confirmed", display_name="Confirmed", required=True, tool_mode=True),
         # Kosongkan value — default dibaca dari env WORKER_BASE_URL / INTERNAL_TOOLS_SECRET
-        # (di HF Spaces: Space Secrets). Isi field ini hanya kalau mau override.
+        # (di VM Oracle: file .env docker-compose). Isi field ini hanya kalau mau override.
         StrInput(name="worker_base_url", display_name="Worker Base URL (override; default dari env)",
                  value="", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret (override; default dari env)",
