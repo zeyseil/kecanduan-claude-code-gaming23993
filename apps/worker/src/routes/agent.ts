@@ -68,7 +68,11 @@ agent.post("/process", async (c) => {
   }
 
   if (!langflowRes.ok) {
-    return c.json({ error: "Langflow gagal memproses permintaan" }, 502);
+    const detail = await langflowRes.text().catch(() => "");
+    return c.json(
+      { error: "Langflow gagal memproses permintaan", langflow_status: langflowRes.status, detail },
+      502,
+    );
   }
 
   const langflowBody = await langflowRes.json();
