@@ -24,6 +24,7 @@ const TOOL_COMPONENT_IDS = [
   "CustomComponent-Dn6gI", // update_chapter
   "CustomComponent-TiPBs", // cari_cover_mangadex
   "CustomComponent-XuCo4", // log_proses
+  "CustomComponent-okkfJ", // set_cover
 ] as const;
 
 agent.post("/process", async (c) => {

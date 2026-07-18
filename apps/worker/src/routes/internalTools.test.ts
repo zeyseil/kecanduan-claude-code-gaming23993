@@ -277,6 +277,43 @@ describe("/internal/tools", () => {
     });
   });
 
+  describe("POST /set-cover", () => {
+    it("sets cover_url on an existing comic", async () => {
+      const comic = seedComic({ cover_url: null });
+
+      const res = await request("/set-cover", {
+        method: "POST",
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({
+          comic_id: comic.comic_id,
+          cover_url: "https://uploads.mangadex.org/covers/x/y.jpg",
+        }),
+      });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ comic_id: comic.comic_id, updated: true });
+      expect(collections.comics[0].cover_url).toBe("https://uploads.mangadex.org/covers/x/y.jpg");
+    });
+
+    it("returns 404 for an unknown comic_id", async () => {
+      const res = await request("/set-cover", {
+        method: "POST",
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({ comic_id: "missing", cover_url: "https://example.com/x.jpg" }),
+      });
+      expect(res.status).toBe(404);
+    });
+
+    it("rejects a missing cover_url", async () => {
+      const comic = seedComic();
+      const res = await request("/set-cover", {
+        method: "POST",
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({ comic_id: comic.comic_id }),
+      });
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe("POST /log-process", () => {
     it("logs a process entry", async () => {
       const res = await request("/log-process", {

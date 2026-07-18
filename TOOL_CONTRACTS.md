@@ -93,6 +93,23 @@ atau `{ "cover_url": null }` kalau tidak ditemukan di MangaDex — user melengka
 
 **Rate limit MangaDex: 5 request/detik per alamat IP.** Ini penting karena sifatnya **per-IP, bukan per-user** — beda dari kuota Gemini yang per API-key. Kalau beberapa user memproses barengan dalam detik yang sama, permintaan gabungan ke MangaDex dari Worker bisa saja tembus 5 req/s meski masing-masing user cuma kirim 1 request. Worker WAJIB punya throttle terpusat (token-bucket sederhana, mis. via Durable Object atau counter timestamp di KV) yang membatasi total panggilan ke MangaDex dari seluruh Worker ke ≤5/detik — bukan cuma rate-limit per user_id yang sudah ada di SPEC.md §3. Kalau limit tercapai, antre singkat (beberapa ratus ms) alih-alih langsung gagal.
 
+**Penting — `fetch-cover` HANYA mengembalikan `cover_url`, tidak menyimpannya.** Gap yang ditemukan lewat testing nyata: awalnya tidak ada mekanisme yang menulis hasil `cover_url` ke comic-nya, jadi comic yang dibuat AI selalu tetap `cover_url: null` walau `fetch-cover` sukses menemukan cover. Fix: tool baru `set-cover` (lihat §4b) — Agent WAJIB memanggilnya setelah `fetch-cover` mengembalikan `cover_url` non-null.
+
+## 4b. POST /internal/tools/set-cover
+
+Implementasi tool `set_cover`. Dipanggil setelah `fetch-cover` mengembalikan `cover_url` non-null, untuk menempelkan URL itu ke comic yang baru dibuat (atau comic manapun by `comic_id`). TIDAK dipanggil kalau `fetch-cover` mengembalikan `cover_url: null` (tidak ada yang perlu disimpan — user melengkapi manual dari halaman visual, sesuai §4).
+
+**Request:**
+```json
+{ "comic_id": "uuid-3", "cover_url": "https://uploads.mangadex.org/covers/.../cover.jpg" }
+```
+**Response:**
+```json
+{ "comic_id": "uuid-3", "updated": true }
+```
+- 404 kalau `comic_id` tidak ditemukan
+- `cover_url` wajib diisi (bukan endpoint untuk menghapus cover — pakai `PATCH /comics/:id` biasa dari web app untuk itu)
+
 ## 5. POST /internal/tools/log-process
 
 Implementasi tool `log_proses`. **WAJIB dipanggil di SEMUA cabang** (created / updated / ambiguous) — lihat SPEC.md §9.
@@ -121,4 +138,5 @@ Implementasi tool `log_proses`. **WAJIB dipanggil di SEMUA cabang** (created / u
 | buat_entry_baru | `/internal/tools/create-comic` | title, type_tag, is_adult, chapter, status | X-User-Id, X-Internal-Secret |
 | update_chapter | `/internal/tools/update-chapter` | comic_id, chapter, status | X-User-Id, X-Internal-Secret |
 | cari_cover_mangadex | `/internal/tools/fetch-cover` | title | X-User-Id, X-Internal-Secret |
+| set_cover | `/internal/tools/set-cover` | comic_id, cover_url | X-User-Id, X-Internal-Secret |
 | log_proses | `/internal/tools/log-process` | input_text, ai_action, target_comic_id, confirmed | X-User-Id, X-Internal-Secret |

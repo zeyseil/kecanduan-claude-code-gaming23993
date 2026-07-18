@@ -6,10 +6,12 @@
 
 ```
 Chat Input --> Agent (Google Generative AI, tool calling) --> Chat Output
-                 ^  ^  ^  ^  ^
-                 |  |  |  |  |
-      5 Custom Component tools (tool_mode=True), masing-masing terhubung ke input "Tools" milik Agent
+                 ^  ^  ^  ^  ^  ^
+                 |  |  |  |  |  |
+      6 Custom Component tools (tool_mode=True), masing-masing terhubung ke input "Tools" milik Agent
 ```
+
+**Node ke-6, `set_cover`, BELUM ADA di flow "yay" existing Anda** — ditambahkan setelah ditemukan gap: `fetch-cover` cuma *mengembalikan* `cover_url`, tidak pernah menyimpannya sendiri. Anda perlu menambahkan Custom Component baru secara manual di Langflow UI (kode di bawah, bagian §6) dan menyambungkannya ke input "Tools" Agent seperti 5 tool lainnya.
 
 ## Component ids (penting — harus sama persis dengan `apps/worker/src/routes/agent.ts`)
 
@@ -23,6 +25,7 @@ Chat Input --> Agent (Google Generative AI, tool calling) --> Chat Output
 | `CustomComponent-Dn6gI` | update_chapter |
 | `CustomComponent-TiPBs` | cari_cover_mangadex |
 | `CustomComponent-XuCo4` | log_proses |
+| `CustomComponent-okkfJ` | set_cover |
 
 ## Tweaks yang dikirim tiap run (dari `agent.ts`)
 
@@ -40,10 +43,11 @@ ATURAN WAJIB (tidak boleh dilanggar):
 1. SELALU panggil tool cari_komik_mirip terlebih dahulu dengan judul kandidat hasil ekstraksi dari teks user, SEBELUM memanggil tool lain apapun.
 2. Kamu TIDAK PERNAH menentukan sendiri apakah ini komik baru atau update berdasarkan penilaianmu — keputusan HARUS mengikuti skor dari cari_komik_mirip:
    - Skor tertinggi >= 0.85 DAN selisih ke kandidat kedua >= 0.15 → panggil update_chapter dengan comic_id kandidat tersebut.
-   - Tidak ada kandidat dengan skor >= 0.5 → panggil buat_entry_baru, lalu panggil cari_cover_mangadex dengan judul yang sama.
+   - Tidak ada kandidat dengan skor >= 0.5 → panggil buat_entry_baru, lalu panggil cari_cover_mangadex dengan judul yang sama. Kalau cari_cover_mangadex mengembalikan cover_url yang TIDAK kosong/null, SELALU panggil set_cover dengan comic_id (dari hasil buat_entry_baru) dan cover_url tersebut — cari_cover_mangadex HANYA mencari URL-nya, TIDAK menyimpannya sendiri, jadi tanpa memanggil set_cover cover tidak akan pernah tersimpan. Kalau cover_url null (tidak ketemu di MangaDex), JANGAN panggil set_cover sama sekali.
    - Ada 2 atau lebih kandidat dengan skor >= 0.5 dan selisih antar-skor < 0.15 (ambigu) → JANGAN panggil tool create/update apapun. Balas ke user dengan daftar kandidat dan minta mereka memilih salah satu atau konfirmasi "ini komik baru".
 3. field is_adult adalah boolean terpisah — JANGAN PERNAH menggabungkannya ke dalam type_tag (mis. menjadi "manhwap" atau semacamnya). Ekstrak is_adult dari teks user sebagai true/false tersendiri.
 4. type_tag hanya boleh salah satu dari: manga, manhwa, manhua.
+4b. field comic_status (dikirim sebagai "status" ke Worker) HANYA BOLEH diisi PERSIS salah satu dari dua string ini, atau dikosongkan: "ongoing", "completed" — Worker akan menolak dengan error 400 kalau nilainya bukan salah satu dari itu (mis. "finished", "tamat", "selesai", "completed reading" SEMUA SALAH, walau maknanya sama). Kalau user bilang "sampai tamat"/"udah selesai"/kata lain yang berarti komik sudah tuntas dibaca/tamat terbit, gunakan literal "completed". Kalau tidak disebutkan status apa pun oleh user, KOSONGKAN field ini (biarkan default "ongoing" di Worker) — jangan menebak salah satu dari dua nilai itu tanpa alasan dari teks user.
 5. SELALU panggil tool log_proses di akhir, di SEMUA cabang (created/updated/ambiguous), dengan input_text = teks asli user, target_comic_id (comic_id yang dibuat/diupdate, atau null kalau ambiguous), dan confirmed (true kalau langsung dieksekusi otomatis, false kalau masih menunggu user memilih pada kasus ambiguous).
    PENTING: field ai_action HARUS diisi PERSIS salah satu dari tiga string ini (jangan pakai nama tool seperti "update_chapter" atau "create_comic" — Worker akan menolak dengan error 400 kalau nilainya bukan salah satu dari tiga ini):
    - "created" — kalau barusan memanggil buat_entry_baru
@@ -122,7 +126,7 @@ class CreateComicTool(Component):
         StrInput(name="type_tag", display_name="Jenis (manga/manhwa/manhua)", required=True, tool_mode=True),
         BoolInput(name="is_adult", display_name="Is Adult", required=True, tool_mode=True),
         FloatInput(name="chapter", display_name="Chapter", required=True, tool_mode=True),
-        StrInput(name="comic_status", display_name="Status (completed atau kosong)", value="", tool_mode=True, advanced=True),
+        StrInput(name="comic_status", display_name="Status: HARUS persis 'ongoing' atau 'completed', atau kosongkan", value="", tool_mode=True, advanced=True),
         StrInput(name="worker_base_url", display_name="Worker Base URL",
                  value="http://localhost:8787", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
@@ -164,7 +168,7 @@ class UpdateChapterTool(Component):
     inputs = [
         StrInput(name="comic_id", display_name="Comic Id", required=True, tool_mode=True),
         FloatInput(name="chapter", display_name="Chapter", required=True, tool_mode=True),
-        StrInput(name="comic_status", display_name="Status (completed atau kosong)", value="", tool_mode=True, advanced=True),
+        StrInput(name="comic_status", display_name="Status: HARUS persis 'ongoing' atau 'completed', atau kosongkan", value="", tool_mode=True, advanced=True),
         StrInput(name="worker_base_url", display_name="Worker Base URL",
                  value="http://localhost:8787", advanced=True),
         StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
@@ -217,7 +221,46 @@ class FetchCoverTool(Component):
         return Data(data=res.json())
 ```
 
-### 5. log_proses → `Tool-log-process`
+### 5. set_cover → `Tool-set-cover` (BARU — belum ada node-nya, bikin manual)
+
+```python
+import httpx
+from langflow.custom import Component
+from langflow.io import StrInput, Output
+from langflow.schema import Data
+
+
+class SetCoverTool(Component):
+    display_name = "set_cover"
+    description = (
+        "Simpan cover_url hasil cari_cover_mangadex ke comic yang baru dibuat. "
+        "WAJIB dipanggil setelah cari_cover_mangadex mengembalikan cover_url yang tidak kosong — "
+        "cari_cover_mangadex sendiri TIDAK menyimpan apa pun, cuma mencari URL-nya."
+    )
+    icon = "image"
+
+    inputs = [
+        StrInput(name="comic_id", display_name="Comic Id", required=True, tool_mode=True),
+        StrInput(name="cover_url", display_name="Cover URL", required=True, tool_mode=True),
+        StrInput(name="worker_base_url", display_name="Worker Base URL",
+                 value="http://localhost:8787", advanced=True),
+        StrInput(name="internal_secret", display_name="Internal Secret", value="", advanced=True),
+        StrInput(name="app_user_id", display_name="App User Id", value="demo-user", advanced=True),
+    ]
+    outputs = [Output(display_name="Hasil", name="result", method="run")]
+
+    def run(self) -> Data:
+        res = httpx.post(
+            f"{self.worker_base_url}/internal/tools/set-cover",
+            json={"comic_id": self.comic_id, "cover_url": self.cover_url},
+            headers={"X-Internal-Secret": self.internal_secret, "X-User-Id": self.app_user_id},
+            timeout=10,
+        )
+        res.raise_for_status()
+        return Data(data=res.json())
+```
+
+### 6. log_proses → `Tool-log-process`
 
 ```python
 import httpx
@@ -262,7 +305,18 @@ class LogProcessTool(Component):
 
 ## Verifikasi setelah import
 
-1. Buka flow di Langflow UI, cek graph: Chat Input → Agent → Chat Output, dan 5 Tool node terhubung ke input "Tools" milik Agent.
-2. Isi field `worker_base_url` di kelima Tool node (default `http://localhost:8787`, ganti kalau Worker Anda di URL lain).
+1. Buka flow di Langflow UI, cek graph: Chat Input → Agent → Chat Output, dan 6 Tool node terhubung ke input "Tools" milik Agent.
+2. Isi field `worker_base_url` di keenam Tool node (default `http://localhost:8787`, ganti kalau Worker Anda di URL lain).
 3. Salin `id` flow dari URL Langflow (`.../flow/<flow-id>`), pasang ke `LANGFLOW_API_URL` di `.dev.vars` sebagai `https://<langflow-host>/api/v1/run/<flow-id>`.
 4. Test langsung di UI Langflow (Playground) dulu dengan input teks contoh, sebelum test lewat `/agent/process` di Worker.
+
+## Menambahkan node `set_cover` ke flow existing (kalau flow Anda dibangun sebelum tool ini ada)
+
+Ditemukan lewat testing nyata: `cari_cover_mangadex` cuma mencari `cover_url`, tidak menyimpannya — comic yang dibuat AI selalu `cover_url` kosong walau pencarian cover-nya sukses. Kalau flow Anda dibuat sebelum perbaikan ini, ikuti langkah berikut (sekali jalan):
+
+1. Di Langflow UI, buka flow "yay" (project "komik-tracker"), buat **Custom Component** baru, tempel kode `SetCoverTool` (§5 di atas).
+2. Cek toolbar node (**"Tool Mode"**) otomatis aktif (lihat catatan Tool Mode di atas), sambungkan output **"Toolset"**-nya ke input "Tools" milik node Agent (sama seperti 5 tool lain).
+3. Isi field `worker_base_url` (default `http://localhost:8787`, sesuaikan) dan `internal_secret` node baru ini sama seperti node lain.
+4. Salin `id` node baru yang di-assign Langflow (klik node → lihat panel/id di kanan, atau lihat network request saat save flow), tempel ke `TOOL_COMPONENT_IDS` di `apps/worker/src/routes/agent.ts` — **sudah dilakukan**, id node `set_cover` di flow "yay" adalah `CustomComponent-okkfJ` (lihat tabel Component ids di atas).
+5. Update system prompt Agent sungguhan di Langflow UI sesuai aturan baru di §"System prompt untuk Agent" di atas (poin 2, sub-bullet "Tidak ada kandidat...") — Agent harus tahu untuk memanggil `set_cover` setelah `cari_cover_mangadex` sukses.
+6. Redeploy/restart Worker (kalau `agent.ts` berubah), lalu test ulang alur buat komik baru sampai tuntas — cek Astra `comics` collection, `cover_url` harus terisi setelah run selesai (bukan lagi kosong).
