@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { TypeTag } from "../types/comic";
 import { TYPE_TAGS } from "../types/comic";
-import type { NewComicInput } from "../lib/createComic";
+import type { NewComicInput } from "../lib/api/comics";
 import { readFileAsDataUrl } from "../lib/cropImage";
 import { ImageCropModal } from "./ImageCropModal";
 
@@ -12,7 +12,7 @@ const TYPE_LABEL: Record<TypeTag, string> = {
 };
 
 interface AddComicFormProps {
-  onSubmit: (input: NewComicInput) => void;
+  onSubmit: (input: NewComicInput) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -24,6 +24,7 @@ export function AddComicForm({ onSubmit, onCancel }: AddComicFormProps) {
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [pendingCropSrc, setPendingCropSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,7 +34,7 @@ export function AddComicForm({ onSubmit, onCancel }: AddComicFormProps) {
     setPendingCropSrc(dataUrl);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const trimmedTitle = title.trim();
@@ -49,13 +50,20 @@ export function AddComicForm({ onSubmit, onCancel }: AddComicFormProps) {
     }
 
     setError(null);
-    onSubmit({
-      title: trimmedTitle,
-      type_tag: typeTag,
-      is_adult: isAdult,
-      latest_chapter: chapterValue,
-      cover_url: coverUrl,
-    });
+    setSubmitting(true);
+    try {
+      await onSubmit({
+        title: trimmedTitle,
+        type_tag: typeTag,
+        is_adult: isAdult,
+        latest_chapter: chapterValue,
+        cover_url: coverUrl,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal menyimpan komik.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -136,15 +144,17 @@ export function AddComicForm({ onSubmit, onCancel }: AddComicFormProps) {
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700"
+            disabled={submitting}
+            className="rounded-md px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700 disabled:opacity-50"
           >
             Batal
           </button>
           <button
             type="submit"
-            className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500"
+            disabled={submitting}
+            className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
           >
-            Tambah Komik
+            {submitting ? "Menyimpan…" : "Tambah Komik"}
           </button>
         </div>
       </form>
