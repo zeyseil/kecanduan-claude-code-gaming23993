@@ -28,6 +28,9 @@ import { HeroBanner } from "../components/HeroBanner";
 import { StatsPanel } from "../components/StatsPanel";
 import { ActivityPanel } from "../components/ActivityPanel";
 import { ReleaseSchedule } from "../components/ReleaseSchedule";
+import { SkeletonGrid, SkeletonHero, SkeletonPanel } from "../components/Skeletons";
+import { ContinueReadingPrompt } from "../components/ContinueReadingPrompt";
+import { takeReadingSession } from "../lib/readingSession";
 
 const RECENT_LIMIT = 8;
 
@@ -45,6 +48,7 @@ export function DaftarKomik() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
+  const [resumeComic, setResumeComic] = useState<Comic | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -55,6 +59,21 @@ export function DaftarKomik() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      const comicId = takeReadingSession();
+      if (!comicId) return;
+      setComics((prev) => {
+        const comic = prev.find((c) => c.comic_id === comicId);
+        if (comic) setResumeComic(comic);
+        return prev;
+      });
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, []);
 
   const loadComics = () => {
@@ -106,6 +125,19 @@ export function DaftarKomik() {
     await deleteComic(editingComic.comic_id);
     setComics((prev) => prev.filter((c) => c.comic_id !== editingComic.comic_id));
     setEditingComic(null);
+  };
+
+  const handleToggleStatus = async (comic: Comic) => {
+    const next = comic.status === "completed" ? "ongoing" : "completed";
+    const updated = await patchComic(comic.comic_id, { status: next });
+    setComics((prev) => prev.map((c) => (c.comic_id === updated.comic_id ? updated : c)));
+  };
+
+  const handleResumeUpdate = async (latestChapter: number) => {
+    if (!resumeComic) return;
+    const updated = await patchComic(resumeComic.comic_id, { latest_chapter: latestChapter });
+    setComics((prev) => prev.map((c) => (c.comic_id === updated.comic_id ? updated : c)));
+    setResumeComic(null);
   };
 
   const enterSelectMode = () => {
@@ -160,7 +192,17 @@ export function DaftarKomik() {
       </div>
 
       {loadStatus === "loading" && (
-        <p className="py-8 text-center text-sm text-slate-400">Memuat komik…</p>
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-6">
+          <div>
+            <SkeletonHero />
+            <SkeletonGrid />
+          </div>
+          <aside className="hidden lg:flex lg:flex-col lg:gap-4">
+            <SkeletonPanel />
+            <SkeletonPanel />
+            <SkeletonPanel />
+          </aside>
+        </div>
       )}
 
       {loadStatus === "error" && (
@@ -206,6 +248,7 @@ export function DaftarKomik() {
               selectMode={selectMode}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
+              onToggleStatus={handleToggleStatus}
             />
           </div>
 
@@ -243,6 +286,14 @@ export function DaftarKomik() {
             Hapus {selectedIds.size} komik
           </button>
         </div>
+      )}
+
+      {resumeComic && (
+        <ContinueReadingPrompt
+          comic={resumeComic}
+          onUpdate={handleResumeUpdate}
+          onDismiss={() => setResumeComic(null)}
+        />
       )}
 
       {showBulkConfirm && (

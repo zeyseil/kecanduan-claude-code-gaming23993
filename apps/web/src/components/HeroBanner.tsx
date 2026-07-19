@@ -1,6 +1,7 @@
 import type { Comic } from "../types/comic";
 import { selectRecent } from "../lib/comicList";
 import { formatChapter } from "../lib/format";
+import { markReadingStarted } from "../lib/readingSession";
 
 const TYPE_LABEL: Record<Comic["type_tag"], string> = {
   manga: "Manga",
@@ -44,6 +45,7 @@ export function HeroBanner({ comics, onEdit }: HeroBannerProps) {
             href={latest.read_url}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => markReadingStarted(latest.comic_id)}
             className="mt-2 inline-flex w-fit items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
           >
             Lanjutkan Membaca (Ch {formatChapter(latest.latest_chapter)})

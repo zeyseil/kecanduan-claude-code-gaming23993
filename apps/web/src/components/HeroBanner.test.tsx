@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HeroBanner } from "./HeroBanner";
 import type { Comic } from "../types/comic";
+import { takeReadingSession } from "../lib/readingSession";
 
 function comic(overrides: Partial<Comic> = {}): Comic {
   return {
@@ -48,5 +49,16 @@ describe("HeroBanner", () => {
 
     await user.click(screen.getByRole("button", { name: /tambahkan link baca/i }));
     expect(onEdit).toHaveBeenCalledWith(latest);
+  });
+
+  it("menandai sesi baca saat link 'Lanjutkan Membaca' diklik", async () => {
+    const user = userEvent.setup();
+    const latest = comic({ comic_id: "abc", read_url: "https://example.com/read/x" });
+    render(<HeroBanner comics={[latest]} onEdit={vi.fn()} />);
+
+    // jsdom tidak benar-benar menavigasi saat klik <a>, jadi cukup memicu onClick.
+    await user.click(screen.getByRole("link", { name: /lanjutkan membaca/i }));
+
+    expect(takeReadingSession()).toBe("abc");
   });
 });

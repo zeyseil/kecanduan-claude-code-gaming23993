@@ -10,6 +10,7 @@ interface ComicGridProps {
   selectMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (comicId: string) => void;
+  onToggleStatus?: (comic: Comic) => void;
 }
 
 export function ComicGrid({
@@ -20,6 +21,7 @@ export function ComicGrid({
   selectMode = false,
   selectedIds,
   onToggleSelect,
+  onToggleStatus,
 }: ComicGridProps) {
   if (comics.length === 0) {
     return (
@@ -52,6 +54,7 @@ export function ComicGrid({
             isSelectable={selectMode}
             isSelected={selectMode && (selectedIds?.has(comic.comic_id) ?? false)}
             onToggleSelect={onToggleSelect}
+            onToggleStatus={selectMode ? undefined : onToggleStatus}
           />
         ))}
       </div>
