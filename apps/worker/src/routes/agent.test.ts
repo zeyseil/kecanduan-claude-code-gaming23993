@@ -245,6 +245,29 @@ describe("/agent/process", () => {
     ]);
   });
 
+  it("uses the per-request model override in the Gemini URL", async () => {
+    const { fetchMock } = mockFetch([[{ text: "ok" }]]);
+
+    await request({ teks_input: "halo", google_api_key: "gk-1", model: "gemini-2.5-flash" });
+
+    const [url] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/models/gemini-2.5-flash:generateContent");
+  });
+
+  it("falls back to the default model when none is given", async () => {
+    const { fetchMock } = mockFetch([[{ text: "ok" }]]);
+
+    await request({ teks_input: "halo", google_api_key: "gk-1" });
+
+    const [url] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/models/gemini-flash-lite-latest:generateContent");
+  });
+
+  it("rejects an empty-string model override", async () => {
+    const res = await request({ teks_input: "halo", google_api_key: "gk-1", model: "  " });
+    expect(res.status).toBe(400);
+  });
+
   it("passes the user's API key as a header, never in the URL", async () => {
     const { fetchMock } = mockFetch([[{ text: "ok" }]]);
 
@@ -541,5 +564,78 @@ describe("/agent/process", () => {
       limitedEnv,
     );
     expect(res.status).toBe(429);
+  });
+});
+
+describe("/agent/models", () => {
+  beforeEach(() => {
+    comicDocs = [];
+    logDocs = [];
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function modelsRequest(body: unknown, token: string | null = "test-token") {
+    return app.request(
+      "/agent/models",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      },
+      testEnv,
+    );
+  }
+
+  it("rejects without a valid token", async () => {
+    const res = await modelsRequest({ google_api_key: "gk-1" }, null);
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects a missing api key", async () => {
+    const res = await modelsRequest({});
+    expect(res.status).toBe(400);
+  });
+
+  it("merges curated models with the account's ListModels result", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            models: [
+              { name: "models/gemini-3-pro", supportedGenerationMethods: ["generateContent"] },
+              { name: "models/text-embedding-004", supportedGenerationMethods: ["embedContent"] },
+            ],
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+
+    const res = await modelsRequest({ google_api_key: "gk-1" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { models: Array<{ id: string; curated: boolean }> };
+    const ids = body.models.map((m) => m.id);
+
+    expect(ids).toContain("gemini-flash-lite-latest"); // curated survives
+    expect(ids).toContain("gemini-3-pro"); // discovered, suitable
+    expect(ids).not.toContain("text-embedding-004"); // embedding filtered out
+  });
+
+  it("maps a rejected key to a 502 with a plain message", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("bad key", { status: 400 })));
+
+    const res = await modelsRequest({ google_api_key: "salah" });
+    expect(res.status).toBe(502);
+    expect((await res.json()) as { error: string }).toMatchObject({
+      error: expect.stringContaining("API key Gemini ditolak"),
+    });
   });
 });

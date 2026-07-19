@@ -19,6 +19,7 @@ const BULK_MATCH_THRESHOLD = 0.85;
 // Each written comic and each MangaDex lookup is one subrequest, so chunk
 // sizes are capped well under that ceiling.
 const MAX_BULK_ENTRIES = 25;
+const MAX_BULK_DELETE = 25;
 const MAX_COVER_BACKFILL = 15;
 // Each title = 1 MangaDex fetch + 1 throttle subrequest, so 10 titles = 20,
 // safely under the 50/invocation ceiling.
@@ -219,6 +220,38 @@ comics.post("/bulk", async (c) => {
       const message = err instanceof Error ? err.message : String(err);
       results.push({ title: entry.title, action: "error", reason: message });
     }
+  }
+
+  return c.json({ results });
+});
+
+// Delete many comics at once. Per-item result so an id that's already gone
+// (e.g. deleted in another tab) doesn't fail the whole batch. Reuses the
+// existing store.deleteComic — no new repository method.
+comics.post("/bulk-delete", async (c) => {
+  const body = await c.req
+    .json<{ comic_ids?: unknown }>()
+    .catch(() => ({}) as { comic_ids?: unknown });
+  if (
+    !Array.isArray(body.comic_ids) ||
+    body.comic_ids.some((id: unknown) => typeof id !== "string")
+  ) {
+    return c.json({ error: "comic_ids harus array of string" }, 400);
+  }
+  if (body.comic_ids.length === 0) {
+    return c.json({ error: "comic_ids tidak boleh kosong" }, 400);
+  }
+  if (body.comic_ids.length > MAX_BULK_DELETE) {
+    return c.json({ error: `comic_ids maksimal ${MAX_BULK_DELETE} per request` }, 400);
+  }
+
+  const userId = c.get("userId");
+  const store = getComicStore(c.env);
+  const results: Array<{ comic_id: string; deleted: boolean }> = [];
+
+  for (const comicId of body.comic_ids as string[]) {
+    const deleted = await store.deleteComic(userId, comicId);
+    results.push({ comic_id: comicId, deleted });
   }
 
   return c.json({ results });

@@ -79,8 +79,12 @@ export async function runAgent(params: {
   userId: string;
   text: string;
   apiKey: string;
+  /** Optional per-request model override (user's dropdown choice). Falls back
+   * to env.GEMINI_MODEL, then the built-in default. */
+  model?: string;
 }): Promise<AgentResult> {
-  const { env, userId, text, apiKey } = params;
+  const { env, userId, text, apiKey, model } = params;
+  const resolvedModel = model || env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
 
   const contents: Content[] = [{ role: "user", parts: [{ text }] }];
   const toolCalls: ToolCallRecord[] = [];
@@ -90,7 +94,7 @@ export async function runAgent(params: {
     for (let turn = 0; turn < MAX_TURNS; turn++) {
       const parts = await generateContent({
         apiKey,
-        model: env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
+        model: resolvedModel,
         systemInstruction: SYSTEM_PROMPT,
         contents,
         functionDeclarations: TOOL_DECLARATIONS,

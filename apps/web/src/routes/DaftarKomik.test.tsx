@@ -13,6 +13,7 @@ vi.mock("../lib/api/comics", async () => {
     postComic: vi.fn(),
     patchComic: vi.fn(),
     deleteComic: vi.fn(),
+    bulkDeleteComics: vi.fn(),
   };
 });
 
@@ -46,12 +47,14 @@ const fetchComicsMock = vi.mocked(api.fetchComics);
 const postComicMock = vi.mocked(api.postComic);
 const patchComicMock = vi.mocked(api.patchComic);
 const deleteComicMock = vi.mocked(api.deleteComic);
+const bulkDeleteComicsMock = vi.mocked(api.bulkDeleteComics);
 
 beforeEach(() => {
   fetchComicsMock.mockReset();
   postComicMock.mockReset();
   patchComicMock.mockReset();
   deleteComicMock.mockReset();
+  bulkDeleteComicsMock.mockReset();
 });
 
 describe("DaftarKomik", () => {
@@ -148,5 +151,37 @@ describe("DaftarKomik", () => {
 
     await waitFor(() => expect(deleteComicMock).toHaveBeenCalledWith("1"));
     await waitFor(() => expect(screen.queryByText("One Piece")).not.toBeInTheDocument());
+  });
+
+  it("bulk-delete: pilih beberapa komik, konfirmasi, lalu hilang dari grid", async () => {
+    const user = userEvent.setup();
+    fetchComicsMock.mockResolvedValue([ONE_PIECE, BERSERK]);
+    bulkDeleteComicsMock.mockResolvedValue([
+      { comic_id: "1", deleted: true },
+      { comic_id: "2", deleted: true },
+    ]);
+    render(<DaftarKomik />);
+
+    await waitFor(() => expect(screen.getAllByText("One Piece").length).toBeGreaterThan(0));
+
+    // Masuk mode pilih.
+    await user.click(screen.getByRole("button", { name: "Pilih" }));
+
+    // Pilih kedua komik dari grid (klik judul di dalam card).
+    const opTitles = screen.getAllByText("One Piece");
+    await user.click(opTitles[opTitles.length - 1]);
+    const bkTitles = screen.getAllByText("Berserk");
+    await user.click(bkTitles[bkTitles.length - 1]);
+
+    expect(screen.getByText("2 dipilih")).toBeInTheDocument();
+
+    // Buka konfirmasi lalu konfirmasi.
+    await user.click(screen.getByRole("button", { name: "Hapus 2 komik" }));
+    await user.click(screen.getByRole("button", { name: "Ya, hapus 2 komik" }));
+
+    await waitFor(() =>
+      expect(bulkDeleteComicsMock).toHaveBeenCalledWith(expect.arrayContaining(["1", "2"])),
+    );
+    await waitFor(() => expect(screen.queryByText("Berserk")).not.toBeInTheDocument());
   });
 });

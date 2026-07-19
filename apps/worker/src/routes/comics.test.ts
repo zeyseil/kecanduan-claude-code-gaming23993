@@ -214,6 +214,76 @@ describe("/comics", () => {
     expect(list).toEqual([]);
   });
 
+  describe("POST /comics/bulk-delete", () => {
+    async function seed(title: string): Promise<string> {
+      const res = await request("/comics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          type_tag: "manga",
+          is_adult: false,
+          latest_chapter: 1,
+          status: "ongoing",
+        }),
+      });
+      return ((await res.json()) as Comic).comic_id;
+    }
+
+    it("rejects a non-array body", async () => {
+      const res = await request("/comics/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comic_ids: "nope" }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("rejects more than the max", async () => {
+      const ids = Array.from({ length: 26 }, (_, i) => `id-${i}`);
+      const res = await request("/comics/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comic_ids: ids }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("rejects without a token", async () => {
+      const res = await app.request(
+        "/comics/bulk-delete",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ comic_ids: ["x"] }),
+        },
+        testEnv,
+      );
+      expect(res.status).toBe(401);
+    });
+
+    it("deletes existing ids and reports missing ones per-item", async () => {
+      const a = await seed("A");
+      const b = await seed("B");
+
+      const res = await request("/comics/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comic_ids: [a, "ghost", b] }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { results: Array<{ comic_id: string; deleted: boolean }> };
+      expect(body.results).toEqual([
+        { comic_id: a, deleted: true },
+        { comic_id: "ghost", deleted: false },
+        { comic_id: b, deleted: true },
+      ]);
+
+      const list = (await (await request("/comics")).json()) as Comic[];
+      expect(list).toEqual([]);
+    });
+  });
+
   it("returns a clear error message when the store fails to save on create", async () => {
     shouldFailWrite = true;
     const res = await request("/comics", {

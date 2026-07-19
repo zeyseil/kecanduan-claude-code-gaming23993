@@ -6,6 +6,7 @@ import {
   type ComicListOptions,
 } from "../lib/comicList";
 import {
+  bulkDeleteComics,
   deleteComic,
   fetchComics,
   patchComic,
@@ -14,6 +15,7 @@ import {
   type NewComicInput,
 } from "../lib/api/comics";
 import type { Comic } from "../types/comic";
+import { downloadMarkdown } from "../lib/exportMarkdown";
 import { Toolbar } from "../components/Toolbar";
 import { ComicGrid } from "../components/ComicGrid";
 import { RecentStrip } from "../components/RecentStrip";
@@ -21,6 +23,7 @@ import { SectionHeader } from "../components/SectionHeader";
 import { AddComicForm } from "../components/AddComicForm";
 import { EditComicForm } from "../components/EditComicForm";
 import { SearchPalette } from "../components/SearchPalette";
+import { BulkDeleteConfirm } from "../components/BulkDeleteConfirm";
 
 const RECENT_LIMIT = 8;
 
@@ -35,6 +38,9 @@ export function DaftarKomik() {
   const [editingComic, setEditingComic] = useState<Comic | null>(null);
   const [pressedComicId, setPressedComicId] = useState<string | null>(null);
   const [showSearchPalette, setShowSearchPalette] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -98,6 +104,44 @@ export function DaftarKomik() {
     setEditingComic(null);
   };
 
+  const enterSelectMode = () => {
+    // Mode pilih & press-to-reveal saling eksklusif.
+    setPressedComicId(null);
+    setSelectMode(true);
+    setSelectedIds(new Set());
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setShowBulkConfirm(false);
+  };
+
+  const handleToggleSelect = (comicId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(comicId)) next.delete(comicId);
+      else next.add(comicId);
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    setSelectedIds(new Set(visible.map((c) => c.comic_id)));
+  };
+
+  const selectedComics = comics.filter((c) => selectedIds.has(c.comic_id));
+
+  const handleBulkDelete = async () => {
+    const ids = selectedComics.map((c) => c.comic_id);
+    const results = await bulkDeleteComics(ids);
+    const removed = new Set(results.filter((r) => r.deleted).map((r) => r.comic_id));
+    // Buang juga id yang server balas "sudah tidak ada" — tetap hilang dari grid.
+    for (const id of ids) removed.add(id);
+    setComics((prev) => prev.filter((c) => !removed.has(c.comic_id)));
+    exitSelectMode();
+  };
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
@@ -136,6 +180,10 @@ export function DaftarKomik() {
             options={options}
             onChange={setOptions}
             onOpenSearch={() => setShowSearchPalette(true)}
+            onExport={() => downloadMarkdown(comics)}
+            canExport={comics.length > 0}
+            onToggleSelect={selectMode ? exitSelectMode : enterSelectMode}
+            selectMode={selectMode}
           />
           <SectionHeader title="Semua Komik" count={visible.length} />
           <ComicGrid
@@ -143,8 +191,47 @@ export function DaftarKomik() {
             pressedComicId={pressedComicId}
             onPress={handlePress}
             onEdit={handleEditOpen}
+            selectMode={selectMode}
+            selectedIds={selectedIds}
+            onToggleSelect={handleToggleSelect}
           />
         </>
+      )}
+
+      {selectMode && (
+        <div className="sticky bottom-0 z-10 mt-4 flex flex-wrap items-center gap-2 border-t border-slate-700 bg-slate-900/95 px-2 py-3 backdrop-blur">
+          <span className="text-sm text-slate-300">{selectedIds.size} dipilih</span>
+          <button
+            type="button"
+            onClick={handleSelectAll}
+            className="rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+          >
+            Pilih semua
+          </button>
+          <button
+            type="button"
+            onClick={exitSelectMode}
+            className="rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowBulkConfirm(true)}
+            disabled={selectedIds.size === 0}
+            className="ml-auto rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-50"
+          >
+            Hapus {selectedIds.size} komik
+          </button>
+        </div>
+      )}
+
+      {showBulkConfirm && (
+        <BulkDeleteConfirm
+          comics={selectedComics}
+          onConfirm={handleBulkDelete}
+          onCancel={() => setShowBulkConfirm(false)}
+        />
       )}
 
       {showAddForm && (

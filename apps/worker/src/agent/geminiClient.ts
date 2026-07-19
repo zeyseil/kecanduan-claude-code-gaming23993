@@ -145,3 +145,34 @@ export async function generateContent(params: {
 
   throw lastError ?? new GeminiError("Gemini gagal tanpa detail");
 }
+
+interface ListModelsResponse {
+  models?: unknown[];
+}
+
+/**
+ * Fetches the raw model list the given API key can reach. No retry: this is
+ * not a hot path, and its failures (bad key = 400/403) are not transient, so
+ * retrying would only stall the user before failing anyway. Returns the raw
+ * entries; filtering/curation lives in models.ts so it stays testable.
+ */
+export async function listModels(apiKey: string): Promise<unknown[]> {
+  let res: Response;
+  try {
+    res = await fetch(API_BASE, {
+      method: "GET",
+      // Header auth, same as generateContent — never `?key=` in a URL.
+      headers: { "x-goog-api-key": apiKey },
+    });
+  } catch (cause) {
+    throw new GeminiError(`Tidak bisa menghubungi Gemini: ${String(cause)}`);
+  }
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new GeminiError("Gemini menolak permintaan", res.status, detail);
+  }
+
+  const parsed = (await res.json()) as ListModelsResponse;
+  return parsed.models ?? [];
+}

@@ -93,6 +93,25 @@ export async function bulkImportComics(entries: ParsedEntry[]): Promise<BulkImpo
   return body.results;
 }
 
+export interface BulkDeleteResultItem {
+  comic_id: string;
+  deleted: boolean;
+}
+
+/** Hapus banyak komik sekaligus (maks 25). Hasil per-item — id yang sudah hilang tidak menggagalkan batch. */
+export async function bulkDeleteComics(comicIds: string[]): Promise<BulkDeleteResultItem[]> {
+  const res = await apiFetch(`${BASE_URL}/comics/bulk-delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ comic_ids: comicIds }),
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessage(res));
+  }
+  const body = (await res.json()) as { results: BulkDeleteResultItem[] };
+  return body.results;
+}
+
 export interface CoverBackfillResultItem {
   comic_id: string;
   cover_url: string | null;
