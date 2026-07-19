@@ -53,7 +53,7 @@ describe("BulkImportPanel", () => {
 
     expect(await screen.findByText(/1 dibuat, 0 diupdate, 0 dilewati, 0 gagal/i)).toBeInTheDocument();
     expect(bulkImportComicsMock).toHaveBeenCalledWith([
-      { title: "Judul benar", type_tag: "manga", is_adult: false, latest_chapter: 1, status: "ongoing" },
+      { title: "Judul benar", type_tag: "manga", is_adult: false, latest_chapter: 1, status: "ongoing", note: null },
     ]);
   });
 
@@ -140,7 +140,7 @@ describe("BulkImportPanel", () => {
     await user.click(screen.getByRole("button", { name: /import 1 entri/i }));
     expect(detectTypesMock).toHaveBeenCalledWith(["Solo Leveling"]);
     expect(bulkImportComicsMock).toHaveBeenCalledWith([
-      { title: "Solo Leveling", type_tag: "manhwa", is_adult: false, latest_chapter: 179, status: "ongoing" },
+      { title: "Solo Leveling", type_tag: "manhwa", is_adult: false, latest_chapter: 179, status: "ongoing", note: null },
     ]);
   });
 

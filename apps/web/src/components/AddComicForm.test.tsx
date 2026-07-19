@@ -51,6 +51,7 @@ describe("AddComicForm", () => {
       cover_url: null,
       read_url: null,
       release_day: null,
+      note: null,
     });
   });
 

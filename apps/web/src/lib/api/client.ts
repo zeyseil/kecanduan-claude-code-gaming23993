@@ -1,4 +1,5 @@
 import { clearAuthToken, getAuthToken } from "../storage";
+import { clearComicCache } from "../comicCache";
 
 /**
  * Shared fetch wrapper for all Worker calls: attaches the auth token as
@@ -16,6 +17,8 @@ export async function apiFetch(url: string, init: RequestInit = {}): Promise<Res
 
   if (res.status === 401) {
     clearAuthToken();
+    // Token tidak valid lagi → cache komik milik user itu ikut dibuang.
+    clearComicCache();
     globalThis.location.href = "/login";
   }
 

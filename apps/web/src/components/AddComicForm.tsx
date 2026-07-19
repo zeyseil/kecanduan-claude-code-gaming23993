@@ -24,6 +24,7 @@ export function AddComicForm({ onSubmit, onCancel }: AddComicFormProps) {
   const [chapter, setChapter] = useState("");
   const [readUrl, setReadUrl] = useState("");
   const [releaseDay, setReleaseDay] = useState("");
+  const [note, setNote] = useState("");
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [pendingCropSrc, setPendingCropSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +68,7 @@ export function AddComicForm({ onSubmit, onCancel }: AddComicFormProps) {
         cover_url: coverUrl,
         read_url: readUrl.trim() || null,
         release_day: releaseDay === "" ? null : Number(releaseDay),
+        note: note.trim() || null,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal menyimpan komik.");
@@ -155,6 +157,18 @@ export function AddComicForm({ onSubmit, onCancel }: AddComicFormProps) {
               </option>
             ))}
           </select>
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm text-slate-300">
+          Catatan (opsional)
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={500}
+            placeholder="mis. hiatus, baca di situs X"
+            className="rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 focus:border-indigo-500 focus:outline-none"
+          />
         </label>
 
         <CoverDropzone

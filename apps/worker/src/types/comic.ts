@@ -15,6 +15,9 @@ export interface Comic {
   read_url: string | null;
   /** Hari rilis mingguan (0=Minggu … 6=Sabtu). null kalau tidak diketahui/tidak rutin. */
   release_day: number | null;
+  /** Catatan bebas user (mis. "hiatus", "S1 end", "baca di warungkomik").
+   * null kalau tidak ada. Tidak pernah diisi AI. */
+  note: string | null;
   created_at: string;
   updated_at: string;
 }

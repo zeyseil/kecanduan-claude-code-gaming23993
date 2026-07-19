@@ -7,8 +7,7 @@ import { rankCandidates } from "../store/fuzzyMatch";
 import { userAuth } from "../middleware/userAuth";
 import { rateLimit } from "../middleware/rateLimit";
 import type { Role } from "../lib/authValue";
-import { acquireMangaDexSlot } from "../durable-objects/RateLimiter";
-import { fetchMangaDexCover, fetchMangaDexInfo } from "../lib/mangadex";
+import { fetchComicInfo } from "../lib/comicInfo";
 
 // Deterministic import path (no AI): score >= this means "same comic", so the
 // entry updates latest_chapter instead of creating a duplicate. Chosen higher
@@ -21,10 +20,18 @@ const BULK_MATCH_THRESHOLD = 0.85;
 // sizes are capped well under that ceiling.
 const MAX_BULK_ENTRIES = 25;
 const MAX_BULK_DELETE = 25;
-const MAX_COVER_BACKFILL = 15;
-// Each title = 1 MangaDex fetch + 1 throttle subrequest, so 10 titles = 20,
-// safely under the 50/invocation ceiling.
-const MAX_DETECT_TITLES = 10;
+// Each item can now hit BOTH MangaDex and AniList (2 throttle + 2 fetch
+// subrequests) plus Astra reads/writes, so caps sit lower than before.
+const MAX_COVER_BACKFILL = 6;
+const MAX_DETECT_TITLES = 8;
+
+/** Free-form user note. Bounded so a stray paste can't blow the Astra 8000-byte
+ * indexed-field limit. */
+const MAX_NOTE_LENGTH = 500;
+
+function isValidNote(value: unknown): value is string {
+  return typeof value === "string" && value.length <= MAX_NOTE_LENGTH;
+}
 
 interface CreateComicBody {
   title?: unknown;
@@ -36,6 +43,7 @@ interface CreateComicBody {
   cover_url?: unknown;
   read_url?: unknown;
   release_day?: unknown;
+  note?: unknown;
 }
 
 // http/https only — this value gets rendered as <a href> on the client, so a
@@ -83,6 +91,9 @@ function validateCreateBody(body: CreateComicBody): string | null {
   if (body.release_day !== undefined && body.release_day !== null && !isValidReleaseDay(body.release_day)) {
     return "release_day harus angka 0-6 atau null";
   }
+  if (body.note !== undefined && body.note !== null && !isValidNote(body.note)) {
+    return `note harus string maksimal ${MAX_NOTE_LENGTH} karakter atau null`;
+  }
   return null;
 }
 
@@ -114,6 +125,7 @@ comics.post("/", async (c) => {
     cover_url: (body.cover_url as string | null | undefined) ?? null,
     read_url: (body.read_url as string | null | undefined) || null,
     release_day: (body.release_day as number | null | undefined) ?? null,
+    note: (body.note as string | null | undefined)?.trim() || null,
     created_at: now,
     updated_at: now,
   };
@@ -134,6 +146,7 @@ interface BulkEntry {
   is_adult?: unknown;
   latest_chapter?: unknown;
   status?: unknown;
+  note?: unknown;
 }
 
 interface BulkResultItem {
@@ -158,6 +171,9 @@ function validateBulkEntry(body: BulkEntry): string | null {
   }
   if (typeof body.status !== "string" || !STATUSES.includes(body.status as Status)) {
     return `status harus salah satu dari: ${STATUSES.join(", ")}`;
+  }
+  if (body.note !== undefined && body.note !== null && !isValidNote(body.note)) {
+    return `note harus string maksimal ${MAX_NOTE_LENGTH} karakter atau null`;
   }
   return null;
 }
@@ -200,6 +216,7 @@ comics.post("/bulk", async (c) => {
       is_adult: rawEntry.is_adult as boolean,
       latest_chapter: rawEntry.latest_chapter as number,
       status: rawEntry.status as Status,
+      note: (rawEntry.note as string | null | undefined)?.trim() || null,
     };
 
     const [best] = rankCandidates(existing, entry.title, 1);
@@ -240,6 +257,7 @@ comics.post("/bulk", async (c) => {
         cover_url: null,
         read_url: null,
         release_day: null,
+        note: entry.note,
         created_at: now,
         updated_at: now,
       };
@@ -287,7 +305,7 @@ comics.post("/bulk-delete", async (c) => {
   return c.json({ results });
 });
 
-// Second pass: fetch MangaDex covers for comics created by bulk import
+// Second pass: fetch covers (MangaDex, AniList fallback) for comics created by bulk import
 // (which always start with cover_url: null). Kept separate from /bulk itself
 // so cover lookups don't compete with comic writes for the subrequest budget.
 comics.post("/backfill-covers", async (c) => {
@@ -318,18 +336,18 @@ comics.post("/backfill-covers", async (c) => {
       continue;
     }
 
-    await acquireMangaDexSlot(c.env.RATE_LIMITER);
-    const coverUrl = await fetchMangaDexCover(comic.title);
+    const info = await fetchComicInfo(comic.title, c.env);
+    const coverUrl = info?.cover_url ?? null;
     if (coverUrl) {
       await store.updateComic(userId, comicId, { cover_url: coverUrl });
     }
-    results.push({ comic_id: comicId, cover_url: coverUrl, reason: coverUrl ? undefined : "tidak ditemukan di MangaDex" });
+    results.push({ comic_id: comicId, cover_url: coverUrl, reason: coverUrl ? undefined : "tidak ditemukan di MangaDex maupun AniList" });
   }
 
   return c.json({ results });
 });
 
-// Auto-detect comic type from MangaDex for import lines where the user didn't
+// Auto-detect comic type from MangaDex (AniList fallback) for import lines where the user didn't
 // write (jenis). Type only — is_adult is NEVER auto-detected (SPEC.md §8: 18+
 // must be explicit from the user, not a system guess). Returns type_tag: null
 // when no confident match / unmapped language, so the UI can flag the line
@@ -351,12 +369,11 @@ comics.post("/detect-type", async (c) => {
 
   const results: Array<{ title: string; type_tag: TypeTag | null; reason?: string }> = [];
   for (const title of body.titles as string[]) {
-    await acquireMangaDexSlot(c.env.RATE_LIMITER);
-    const info = await fetchMangaDexInfo(title);
+    const info = await fetchComicInfo(title, c.env);
     if (!info) {
-      results.push({ title, type_tag: null, reason: "tidak ditemukan di MangaDex" });
+      results.push({ title, type_tag: null, reason: "tidak ditemukan di MangaDex maupun AniList" });
     } else if (!info.type_tag) {
-      results.push({ title, type_tag: null, reason: "jenis tidak dikenali dari bahasa asal" });
+      results.push({ title, type_tag: null, reason: "jenis tidak dikenali dari bahasa/negara asal" });
     } else {
       results.push({ title, type_tag: info.type_tag });
     }
@@ -430,6 +447,12 @@ comics.patch("/:id", async (c) => {
       return c.json({ error: "release_day harus angka 0-6 atau null" }, 400);
     }
     patch.release_day = body.release_day as number | null;
+  }
+  if (body.note !== undefined) {
+    if (body.note !== null && !isValidNote(body.note)) {
+      return c.json({ error: `note harus string maksimal ${MAX_NOTE_LENGTH} karakter atau null` }, 400);
+    }
+    patch.note = (body.note as string | null)?.trim() || null;
   }
 
   try {

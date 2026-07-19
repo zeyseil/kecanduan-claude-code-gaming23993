@@ -155,6 +155,11 @@ function mockFetch(turns: Turn[], mangadexCover: string | null = "cover-file.jpg
         { status: 200 },
       );
     }
+    if (String(url).includes("graphql.anilist.co")) {
+      // AniList fallback (fetchComicInfo) — empty result by default so tests
+      // exercising "not found" stay not-found across both sources.
+      return new Response(JSON.stringify({ data: { Page: { media: [] } } }), { status: 200 });
+    }
     throw new Error(`fetch tak terduga ke ${url}`);
   });
 
@@ -190,6 +195,7 @@ function seedComic(overrides: Partial<Comic> = {}): ComicDocument {
     cover_url: null,
     read_url: null,
     release_day: null,
+    note: null,
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",
     ...overrides,

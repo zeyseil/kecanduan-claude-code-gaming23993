@@ -12,6 +12,7 @@ function toComic(doc: Comic & { user_id: string; _id?: unknown }): Comic {
   // missing entirely (Astra is schemaless) — normalize to null so the type stays honest.
   comic.read_url = comic.read_url ?? null;
   comic.release_day = comic.release_day ?? null;
+  comic.note = comic.note ?? null;
   return comic;
 }
 
