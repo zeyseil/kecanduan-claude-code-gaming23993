@@ -1,5 +1,12 @@
 import type { Comic, TypeTag } from "../../types/comic";
+import type { ParsedEntry } from "../parseHistoris";
 import { apiFetch } from "./client";
+
+export interface DetectTypeResultItem {
+  title: string;
+  type_tag: TypeTag | null;
+  reason?: string;
+}
 
 const BASE_URL = import.meta.env.VITE_WORKER_URL ?? "http://localhost:8787";
 
@@ -63,4 +70,58 @@ export async function postComic(input: NewComicInput): Promise<Comic> {
     throw new Error(await errorMessage(res));
   }
   return res.json() as Promise<Comic>;
+}
+
+export interface BulkImportResultItem {
+  title: string;
+  action: "created" | "updated" | "skipped" | "error";
+  comic_id?: string;
+  reason?: string;
+}
+
+/** Deterministic import from parsed historical data — no AI involved. */
+export async function bulkImportComics(entries: ParsedEntry[]): Promise<BulkImportResultItem[]> {
+  const res = await apiFetch(`${BASE_URL}/comics/bulk`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ entries }),
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessage(res));
+  }
+  const body = (await res.json()) as { results: BulkImportResultItem[] };
+  return body.results;
+}
+
+export interface CoverBackfillResultItem {
+  comic_id: string;
+  cover_url: string | null;
+  reason?: string;
+}
+
+export async function backfillCovers(comicIds: string[]): Promise<CoverBackfillResultItem[]> {
+  const res = await apiFetch(`${BASE_URL}/comics/backfill-covers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ comic_ids: comicIds }),
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessage(res));
+  }
+  const body = (await res.json()) as { results: CoverBackfillResultItem[] };
+  return body.results;
+}
+
+/** Auto-detect comic type from MangaDex for import lines that lack (jenis). */
+export async function detectTypes(titles: string[]): Promise<DetectTypeResultItem[]> {
+  const res = await apiFetch(`${BASE_URL}/comics/detect-type`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ titles }),
+  });
+  if (!res.ok) {
+    throw new Error(await errorMessage(res));
+  }
+  const body = (await res.json()) as { results: DetectTypeResultItem[] };
+  return body.results;
 }

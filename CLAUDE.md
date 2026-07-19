@@ -342,6 +342,10 @@ Harus nyaman di HP, tablet, laptop. Desain mobile-first.
    langkah konkret, bukan "silakan dicoba" jika memerlukan verifikasi secara manual oleh user, selain itu otomatis.
 - Kalau saya tanya kenapa kamu menulis sesuatu, jelaskan sejujurnya. Termasuk
    kalau itu pilihan yang lemah.
+- **Setiap fitur baru wajib menampilkan batasannya di UI** (blok catatan permanen
+   di dekat kontrol fitur, bukan toast sementara) supaya user tahu batasan saat
+   memakainya — mis. blok "Batasan fitur ini" di `apps/web/src/components/BulkImportPanel.tsx`.
+   Isi catatan harus mencerminkan perilaku sebenarnya, bukan aspirasi.
 - **PENTING: Setiap sesi selesai, perbarui file
    ini (CLAUDE.md) menyesuaikan format yang telah ada(jika ada). Ini menjaga CLAUDE.md tetap akurat sebagai single source of
    truth untuk apa yang sudah dikerjakan.

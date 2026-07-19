@@ -134,12 +134,17 @@ function mockFetch(turns: Turn[], mangadexCover: string | null = "cover-file.jpg
       return geminiReply(typeof turn === "function" ? turn() : turn);
     }
     if (String(url).includes("api.mangadex.org")) {
+      // Echo the queried title back as the entry's title so it clears the
+      // similarity gate in fetchMangaDexInfo (matches the real API shape:
+      // attributes.title + originalLanguage).
+      const queried = decodeURIComponent(new URL(String(url)).searchParams.get("title") ?? "");
       return new Response(
         JSON.stringify({
           data: mangadexCover
             ? [
                 {
                   id: "manga-1",
+                  attributes: { title: { en: queried }, altTitles: [], originalLanguage: "ja" },
                   relationships: [
                     { type: "cover_art", attributes: { fileName: mangadexCover } },
                   ],

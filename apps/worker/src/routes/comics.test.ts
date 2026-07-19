@@ -81,12 +81,18 @@ const fakeUserRateLimiterNamespace = {
   get: () => ({ fetch: async () => new Response("ok", { status: 200 }) }),
 };
 
+const fakeRateLimiterNamespace = {
+  idFromName: (name: string) => name,
+  get: () => ({ fetch: async () => new Response("ok") }),
+};
+
 const testEnv = {
   ASTRA_DB_API_ENDPOINT: "https://fake.apps.astra.datastax.com",
   ASTRA_DB_APPLICATION_TOKEN: "fake-token",
   ASTRA_DB_COLLECTION: "comics",
   AUTH_TOKENS: { get: async (key: string) => fakeTokens.get(key) ?? null },
   USER_RATE_LIMITER: fakeUserRateLimiterNamespace,
+  RATE_LIMITER: fakeRateLimiterNamespace,
 };
 
 function request(input: string, init?: RequestInit) {
@@ -266,5 +272,306 @@ describe("/comics", () => {
       limitedEnv,
     );
     expect(res.status).toBe(429);
+  });
+
+  describe("POST /comics/bulk", () => {
+    it("rejects more than the max chunk size", async () => {
+      const entries = Array.from({ length: 26 }, (_, i) => ({
+        title: `Judul ${i}`,
+        type_tag: "manga",
+        is_adult: false,
+        latest_chapter: 1,
+        status: "ongoing",
+      }));
+      const res = await request("/comics/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entries }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("rejects an empty entries array", async () => {
+      const res = await request("/comics/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [] }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("creates new comics that don't match anything existing", async () => {
+      const res = await request("/comics/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: [
+            { title: "One Piece", type_tag: "manga", is_adult: false, latest_chapter: 1, status: "ongoing" },
+            { title: "Berserk", type_tag: "manga", is_adult: true, latest_chapter: 300, status: "ongoing" },
+          ],
+        }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { results: Array<{ title: string; action: string }> };
+      expect(body.results).toEqual([
+        { title: "One Piece", action: "created", comic_id: expect.any(String) },
+        { title: "Berserk", action: "created", comic_id: expect.any(String) },
+      ]);
+
+      const listRes = await request("/comics");
+      const list = (await listRes.json()) as Comic[];
+      expect(list).toHaveLength(2);
+    });
+
+    it("updates an existing comic when the imported chapter is higher (upsert, not duplicate)", async () => {
+      const createRes = await request("/comics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "Naruto",
+          type_tag: "manga",
+          is_adult: false,
+          latest_chapter: 5,
+          status: "ongoing",
+        }),
+      });
+      const created = (await createRes.json()) as Comic;
+
+      const res = await request("/comics/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: [
+            { title: "Naruto", type_tag: "manga", is_adult: false, latest_chapter: 10, status: "ongoing" },
+          ],
+        }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { results: Array<{ title: string; action: string; comic_id: string }> };
+      expect(body.results).toEqual([{ title: "Naruto", action: "updated", comic_id: created.comic_id }]);
+
+      const listRes = await request("/comics");
+      const list = (await listRes.json()) as Comic[];
+      expect(list).toHaveLength(1);
+      expect(list[0].latest_chapter).toBe(10);
+    });
+
+    it("skips (not duplicates) when the imported chapter isn't higher than what's stored", async () => {
+      const createRes = await request("/comics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "Naruto",
+          type_tag: "manga",
+          is_adult: false,
+          latest_chapter: 10,
+          status: "ongoing",
+        }),
+      });
+      const created = (await createRes.json()) as Comic;
+
+      const res = await request("/comics/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: [
+            { title: "Naruto", type_tag: "manga", is_adult: false, latest_chapter: 10, status: "ongoing" },
+          ],
+        }),
+      });
+      const body = (await res.json()) as { results: Array<{ title: string; action: string; comic_id: string }> };
+      expect(body.results).toEqual([
+        { title: "Naruto", action: "skipped", comic_id: created.comic_id, reason: expect.any(String) },
+      ]);
+
+      const listRes = await request("/comics");
+      const list = (await listRes.json()) as Comic[];
+      expect(list).toHaveLength(1);
+    });
+
+    it("reports invalid entries as errors without failing the whole chunk", async () => {
+      const res = await request("/comics/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: [
+            { title: "Valid Comic", type_tag: "manga", is_adult: false, latest_chapter: 1, status: "ongoing" },
+            { title: "", type_tag: "manga", is_adult: false, latest_chapter: 1, status: "ongoing" },
+          ],
+        }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { results: Array<{ action: string }> };
+      expect(body.results[0].action).toBe("created");
+      expect(body.results[1].action).toBe("error");
+    });
+  });
+
+  describe("POST /comics/backfill-covers", () => {
+    it("rejects more than the max chunk size", async () => {
+      const res = await request("/comics/backfill-covers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comic_ids: Array.from({ length: 16 }, (_, i) => `id-${i}`) }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("fetches and saves a cover for a comic missing one", async () => {
+      const createRes = await request("/comics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "One Piece",
+          type_tag: "manga",
+          is_adult: false,
+          latest_chapter: 1,
+          status: "ongoing",
+        }),
+      });
+      const created = (await createRes.json()) as Comic;
+
+      const fetchMock = vi.fn(async (url: string) => {
+        // Echo the queried title so the entry clears the similarity gate in
+        // fetchMangaDexInfo (real API shape: attributes.title + originalLanguage).
+        const queried = decodeURIComponent(new URL(url).searchParams.get("title") ?? "");
+        return new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: "manga-1",
+                attributes: { title: { en: queried }, altTitles: [], originalLanguage: "ja" },
+                relationships: [{ type: "cover_art", attributes: { fileName: "cover.jpg" } }],
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const res = await request("/comics/backfill-covers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comic_ids: [created.comic_id] }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { results: Array<{ comic_id: string; cover_url: string | null }> };
+      expect(body.results[0].cover_url).toBe("https://uploads.mangadex.org/covers/manga-1/cover.jpg");
+
+      const listRes = await request("/comics");
+      const list = (await listRes.json()) as Comic[];
+      expect(list[0].cover_url).toBe("https://uploads.mangadex.org/covers/manga-1/cover.jpg");
+
+      vi.unstubAllGlobals();
+    });
+
+    it("reports missing comics without throwing", async () => {
+      const res = await request("/comics/backfill-covers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comic_ids: ["missing-id"] }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { results: Array<{ comic_id: string; reason?: string }> };
+      expect(body.results).toEqual([{ comic_id: "missing-id", cover_url: null, reason: "comic tidak ditemukan" }]);
+    });
+
+    it("leaves cover_url null when MangaDex has no match, without failing other entries", async () => {
+      const createRes = await request("/comics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "Judul Antah Berantah",
+          type_tag: "manga",
+          is_adult: false,
+          latest_chapter: 1,
+          status: "ongoing",
+        }),
+      });
+      const created = (await createRes.json()) as Comic;
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(JSON.stringify({ data: [] }), { status: 200 })),
+      );
+
+      const res = await request("/comics/backfill-covers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comic_ids: [created.comic_id] }),
+      });
+      const body = (await res.json()) as { results: Array<{ cover_url: string | null; reason?: string }> };
+      expect(body.results[0].cover_url).toBeNull();
+      expect(body.results[0].reason).toBe("tidak ditemukan di MangaDex");
+
+      vi.unstubAllGlobals();
+    });
+  });
+
+  describe("POST /comics/detect-type", () => {
+    it("rejects requests without a valid Authorization token", async () => {
+      const res = await app.request(
+        "/comics/detect-type",
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ titles: ["Naruto"] }) },
+        testEnv,
+      );
+      expect(res.status).toBe(401);
+    });
+
+    it("rejects more than the max number of titles", async () => {
+      const res = await request("/comics/detect-type", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ titles: Array.from({ length: 11 }, (_, i) => `Judul ${i}`) }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("detects type_tag from MangaDex originalLanguage", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          const queried = decodeURIComponent(new URL(url).searchParams.get("title") ?? "");
+          return new Response(
+            JSON.stringify({
+              data: [
+                { id: "m-1", attributes: { title: { en: queried }, altTitles: [], originalLanguage: "ko" }, relationships: [] },
+              ],
+            }),
+            { status: 200 },
+          );
+        }),
+      );
+
+      const res = await request("/comics/detect-type", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ titles: ["Solo Leveling"] }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { results: Array<{ title: string; type_tag: string | null }> };
+      expect(body.results).toEqual([{ title: "Solo Leveling", type_tag: "manhwa" }]);
+
+      vi.unstubAllGlobals();
+    });
+
+    it("reports type_tag null with a reason when nothing matches", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(JSON.stringify({ data: [] }), { status: 200 })),
+      );
+
+      const res = await request("/comics/detect-type", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ titles: ["Judul Antah Berantah"] }),
+      });
+      const body = (await res.json()) as { results: Array<{ type_tag: string | null; reason?: string }> };
+      expect(body.results[0].type_tag).toBeNull();
+      expect(body.results[0].reason).toBeTruthy();
+
+      vi.unstubAllGlobals();
+    });
   });
 });
