@@ -645,3 +645,42 @@ describe("/comics", () => {
     });
   });
 });
+
+describe("CORS", () => {
+  function preflight(origin: string, env: Record<string, unknown>) {
+    return app.request(
+      "/comics",
+      {
+        method: "OPTIONS",
+        headers: {
+          Origin: origin,
+          "Access-Control-Request-Method": "GET",
+        },
+      },
+      env,
+    );
+  }
+
+  it("allows an origin listed in ALLOWED_ORIGINS", async () => {
+    const env = { ...testEnv, ALLOWED_ORIGINS: "https://komik.pages.dev" };
+    const res = await preflight("https://komik.pages.dev", env);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(
+      "https://komik.pages.dev",
+    );
+  });
+
+  it("does not allow an origin outside ALLOWED_ORIGINS", async () => {
+    const env = { ...testEnv, ALLOWED_ORIGINS: "https://komik.pages.dev" };
+    const res = await preflight("https://evil.example", env);
+    expect(res.headers.get("Access-Control-Allow-Origin")).not.toBe(
+      "https://evil.example",
+    );
+  });
+
+  it("falls back to localhost dev origin when ALLOWED_ORIGINS is unset", async () => {
+    const res = await preflight("http://localhost:5173", testEnv);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(
+      "http://localhost:5173",
+    );
+  });
+});
