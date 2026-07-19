@@ -56,6 +56,7 @@ export function ComicCard({
             src={comic.cover_url}
             alt={`Cover ${comic.title}`}
             loading="lazy"
+            referrerPolicy="no-referrer"
             className="h-full w-full object-cover"
           />
         ) : (
