@@ -112,4 +112,31 @@ describe("ComicCard", () => {
     expect(screen.getByLabelText("Terpilih untuk dihapus")).toBeInTheDocument();
     expect(container.querySelector(".shadow-glow-danger")).not.toBeNull();
   });
+
+  it("tidak menampilkan tombol status kalau tidak isPressed", () => {
+    render(<ComicCard comic={comic()} onPress={vi.fn()} onToggleStatus={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /^Tandai/ })).not.toBeInTheDocument();
+  });
+
+  it("menampilkan tombol 'Tandai sebagai tamat' saat status ongoing dan isPressed", async () => {
+    const user = userEvent.setup();
+    const onToggleStatus = vi.fn();
+    const onPress = vi.fn();
+    const c = comic({ status: "ongoing" });
+    render(<ComicCard comic={c} isPressed onPress={onPress} onToggleStatus={onToggleStatus} />);
+
+    const button = screen.getByRole("button", { name: `Tandai ${c.title} sebagai tamat` });
+    await user.click(button);
+
+    expect(onToggleStatus).toHaveBeenCalledWith(c);
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it("menampilkan tombol 'Tandai sebagai ongoing' saat status completed", () => {
+    const c = comic({ status: "completed" });
+    render(<ComicCard comic={c} isPressed onPress={vi.fn()} onToggleStatus={vi.fn()} />);
+    expect(
+      screen.getByRole("button", { name: `Tandai ${c.title} sebagai ongoing` }),
+    ).toBeInTheDocument();
+  });
 });

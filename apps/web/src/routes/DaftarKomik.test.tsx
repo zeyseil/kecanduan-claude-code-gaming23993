@@ -1,9 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DaftarKomik } from "./DaftarKomik";
 import * as api from "../lib/api/comics";
 import type { Comic } from "../types/comic";
+import { markReadingStarted } from "../lib/readingSession";
+
+/** Simulasikan tab kembali terlihat (dipicu HeroBanner via markReadingStarted). */
+function simulateTabVisible() {
+  Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+  act(() => {
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+}
 
 vi.mock("../lib/api/comics", async () => {
   const actual = await vi.importActual<typeof api>("../lib/api/comics");
@@ -71,7 +80,7 @@ describe("DaftarKomik", () => {
     fetchComicsMock.mockResolvedValue([ONE_PIECE]);
     render(<DaftarKomik />);
 
-    expect(screen.getByText("Memuat komik…")).toBeInTheDocument();
+    expect(screen.getAllByTestId("skeleton-grid").length).toBeGreaterThan(0);
 
     await waitFor(() => expect(screen.getAllByText("One Piece").length).toBeGreaterThan(0));
   });
@@ -125,6 +134,62 @@ describe("DaftarKomik", () => {
       ),
     );
     await waitFor(() => expect(screen.getAllByText(/Ch 1121/).length).toBeGreaterThan(0));
+  });
+
+  it("toggle status komik lewat tombol di card tanpa membuka modal", async () => {
+    const user = userEvent.setup();
+    fetchComicsMock.mockResolvedValue([ONE_PIECE]);
+    patchComicMock.mockResolvedValue({ ...ONE_PIECE, status: "completed" });
+    render(<DaftarKomik />);
+
+    await waitFor(() => expect(screen.getAllByText("One Piece").length).toBeGreaterThan(0));
+
+    await user.click(gridTitle("One Piece"));
+    await user.click(screen.getByRole("button", { name: `Tandai ${ONE_PIECE.title} sebagai tamat` }));
+
+    await waitFor(() =>
+      expect(patchComicMock).toHaveBeenCalledWith("1", { status: "completed" }),
+    );
+    await waitFor(() => expect(gridTitle("One Piece")).toBeInTheDocument());
+    expect(screen.queryByText(`Edit Komik — ${ONE_PIECE.title}`)).not.toBeInTheDocument();
+  });
+
+  it("menampilkan prompt lanjut baca saat tab kembali terlihat setelah markReadingStarted", async () => {
+    const user = userEvent.setup();
+    fetchComicsMock.mockResolvedValue([ONE_PIECE]);
+    patchComicMock.mockResolvedValue({ ...ONE_PIECE, latest_chapter: 1121 });
+    render(<DaftarKomik />);
+
+    await waitFor(() => expect(screen.getAllByText("One Piece").length).toBeGreaterThan(0));
+
+    markReadingStarted(ONE_PIECE.comic_id);
+    simulateTabVisible();
+
+    expect(await screen.findByText("Selesai baca?")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Update" }));
+
+    await waitFor(() =>
+      expect(patchComicMock).toHaveBeenCalledWith("1", { latest_chapter: 1121 }),
+    );
+    expect(screen.queryByText("Selesai baca?")).not.toBeInTheDocument();
+  });
+
+  it("prompt lanjut baca tidak muncul lagi setelah dismiss tanpa sesi baru", async () => {
+    const user = userEvent.setup();
+    fetchComicsMock.mockResolvedValue([ONE_PIECE]);
+    render(<DaftarKomik />);
+    await waitFor(() => expect(screen.getAllByText("One Piece").length).toBeGreaterThan(0));
+
+    markReadingStarted(ONE_PIECE.comic_id);
+    simulateTabVisible();
+    expect(await screen.findByText("Selesai baca?")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Belum selesai" }));
+    expect(screen.queryByText("Selesai baca?")).not.toBeInTheDocument();
+
+    simulateTabVisible();
+    expect(screen.queryByText("Selesai baca?")).not.toBeInTheDocument();
   });
 
   it("membuka search palette lewat tombol dan memilih hasil membuka modal edit", async () => {
