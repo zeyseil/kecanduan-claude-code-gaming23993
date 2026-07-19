@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import type { Env } from "./env";
 import { comics } from "./routes/comics";
 import { agent } from "./routes/agent";
+import { admin } from "./routes/admin";
 import { scheduled } from "./scheduled";
 
 export const app = new Hono<{ Bindings: Env }>();
@@ -24,6 +25,7 @@ app.use("*", (c, next) => {
 app.get("/", (c) => c.json({ name: "komik-tracker-worker", status: "ok" }));
 app.route("/comics", comics);
 app.route("/agent", agent);
+app.route("/admin", admin);
 
 // Object export (not the bare Hono app) so the cron `scheduled` handler is
 // registered alongside `fetch`. See scheduled.ts + [triggers] in wrangler.toml.

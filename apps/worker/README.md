@@ -13,7 +13,23 @@ Cloudflare Worker (Hono) — backend perantara antara `apps/web` dan Astra DB.
 
 ## Setup Auth (token per user)
 
-`/comics` dan `/agent/process` sekarang butuh header `Authorization: Bearer <token>`. Token disimpan sebagai key di Cloudflare KV, value-nya `user_id` bebas (string apa saja, dipakai sebagai partisi data — lihat `middleware/userAuth.ts`). Tidak ada endpoint register — provisioning token manual.
+`/comics`, `/agent/process`, dan `/admin/*` sekarang butuh header `Authorization: Bearer <token>`. Token disimpan sebagai key di Cloudflare KV. Value-nya bisa dua bentuk (lihat `lib/authValue.ts`):
+
+- **Legacy (bare string):** `user_id` polos, mis. `sigma-god`. Semua token lama tetap jalan tanpa migrasi — di-treat sebagai role `user`.
+- **Baru (JSON):** `{"user_id":"<id>","role":"admin"|"user"}`. Role `admin` membuka dashboard admin (`/admin/*` + halaman `/admin` di web).
+
+Tidak ada endpoint register — provisioning token manual. **Token biasa (role `user`) juga bisa dibuat/dicabut dari dashboard admin di web**, tapi **role `admin` HANYA bisa diberikan lewat `wrangler`** (perintah di bawah) — tidak pernah dari browser.
+
+### Menjadikan sebuah token admin (wrangler-only)
+
+Tulis value token sebagai JSON dengan `role: "admin"`, ke **kedua** namespace (production + preview, sama seperti token biasa):
+
+```
+wrangler kv key put --binding=AUTH_TOKENS "<token-anda>" '{"user_id":"<user-id>","role":"admin"}' --remote --preview false
+wrangler kv key put --binding=AUTH_TOKENS "<token-anda>" '{"user_id":"<user-id>","role":"admin"}' --remote --preview
+```
+
+Ini satu-satunya jalan memberi role admin. Mencabut admin juga wrangler-only — dashboard sengaja menolak mencabut token admin (mencegah admin mengunci dirinya sendiri).
 
 **Penting — dev server konek ke KV cloud asli, bukan simulasi lokal, lewat "mixed mode" (bukan `--remote` lagi).** Sejak Worker punya binding Durable Object (`RATE_LIMITER`, `USER_RATE_LIMITER`), wrangler v4 **tidak mengizinkan** `wrangler dev --remote` lagi ("wrangler dev --remote is no longer supported for Durable Objects"). Solusinya: binding `AUTH_TOKENS` di `wrangler.toml` ditandai `remote = true` — ini membuat KV konek ke cloud asli sementara Durable Object tetap simulasi lokal (satu Worker, sebagian binding lokal sebagian remote). Cukup jalankan `wrangler dev` biasa (**tanpa** `--remote`) — proyek ini sudah pin `wrangler` ke versi 4 di `package.json` supaya fitur ini didukung.
 

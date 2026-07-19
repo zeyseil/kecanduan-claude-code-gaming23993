@@ -1,8 +1,13 @@
+import { useEffect, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { DaftarKomik } from "./routes/DaftarKomik";
 import { Tulis } from "./routes/Tulis";
 import { Login } from "./routes/Login";
+import { Admin } from "./routes/Admin";
 import { RequireAuth } from "./components/RequireAuth";
+import { RequireAdmin } from "./components/RequireAdmin";
+import { getAuthToken } from "./lib/storage";
+import { fetchAdminHealth } from "./lib/api/admin";
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   [
@@ -13,6 +18,22 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
   ].join(" ");
 
 export function App() {
+  // Probe admin status once so the "Admin" nav link only appears for admins.
+  // A non-admin gets 403 (caught → stays hidden); no token → not probed.
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    if (!getAuthToken()) return;
+    let alive = true;
+    fetchAdminHealth()
+      .then(() => alive && setIsAdmin(true))
+      .catch(() => {
+        /* not an admin, or offline — link stays hidden */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <header className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/90 backdrop-blur">
@@ -27,6 +48,11 @@ export function App() {
             <NavLink to="/tulis" className={navClass}>
               Tulis
             </NavLink>
+            {isAdmin && (
+              <NavLink to="/admin" className={navClass}>
+                Admin
+              </NavLink>
+            )}
           </nav>
         </div>
       </header>
@@ -47,6 +73,16 @@ export function App() {
             element={
               <RequireAuth>
                 <Tulis />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <RequireAuth>
+                <RequireAdmin>
+                  <Admin />
+                </RequireAdmin>
               </RequireAuth>
             }
           />
