@@ -13,6 +13,8 @@ const ONE_PIECE: Comic = {
   latest_chapter: 1120,
   status: "ongoing",
   cover_url: null,
+  read_url: null,
+  release_day: null,
   created_at: "2026-01-01T00:00:00.000Z",
   updated_at: "2026-01-01T00:00:00.000Z",
 };
@@ -26,6 +28,8 @@ const BERSERK: Comic = {
   latest_chapter: 364,
   status: "ongoing",
   cover_url: null,
+  read_url: null,
+  release_day: null,
   created_at: "2026-01-02T00:00:00.000Z",
   updated_at: "2026-01-02T00:00:00.000Z",
 };

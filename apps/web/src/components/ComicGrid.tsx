@@ -30,7 +30,7 @@ export function ComicGrid({
   }
 
   return (
-    <div className="relative">
+    <div className="relative" data-testid="comic-grid">
       {/* Backdrop click-catcher hanya untuk press-to-reveal; dimatikan di mode
           pilih supaya klik pertama tidak dimakan backdrop. */}
       {!selectMode && pressedComicId !== null && (
@@ -40,7 +40,7 @@ export function ComicGrid({
           className="fixed inset-0 z-0"
         />
       )}
-      <div className="relative z-[1] grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+      <div className="relative z-[1] grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5">
         {comics.map((comic) => (
           <ComicCard
             key={comic.comic_id}

@@ -11,6 +11,10 @@ export interface Comic {
   latest_chapter: number;
   status: Status;
   cover_url: string | null;
+  /** URL tempat user membaca komik ini. null kalau belum diisi. Tidak pernah diisi AI. */
+  read_url: string | null;
+  /** Hari rilis mingguan (0=Minggu … 6=Sabtu). null kalau tidak diketahui/tidak rutin. */
+  release_day: number | null;
   created_at: string;
   updated_at: string;
 }

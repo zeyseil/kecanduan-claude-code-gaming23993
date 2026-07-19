@@ -188,6 +188,8 @@ function seedComic(overrides: Partial<Comic> = {}): ComicDocument {
     latest_chapter: 32,
     status: "ongoing",
     cover_url: null,
+    read_url: null,
+    release_day: null,
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",
     ...overrides,

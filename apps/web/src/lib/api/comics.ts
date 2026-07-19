@@ -18,6 +18,10 @@ export interface NewComicInput {
   latest_chapter: number;
   /** Data URL hasil crop, atau null kalau user belum pilih gambar. */
   cover_url: string | null;
+  /** URL tempat user membaca komik ini. null/kosong kalau belum diisi. */
+  read_url: string | null;
+  /** Hari rilis mingguan (0=Minggu … 6=Sabtu). null kalau tidak diketahui. */
+  release_day: number | null;
 }
 
 export async function errorMessage(res: Response): Promise<string> {
@@ -37,7 +41,18 @@ export async function fetchComics(): Promise<Comic[]> {
 }
 
 export type ComicPatch = Partial<
-  Pick<Comic, "title" | "aliases" | "type_tag" | "is_adult" | "latest_chapter" | "status" | "cover_url">
+  Pick<
+    Comic,
+    | "title"
+    | "aliases"
+    | "type_tag"
+    | "is_adult"
+    | "latest_chapter"
+    | "status"
+    | "cover_url"
+    | "read_url"
+    | "release_day"
+  >
 >;
 
 export async function patchComic(id: string, patch: ComicPatch): Promise<Comic> {

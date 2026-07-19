@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DaftarKomik } from "./DaftarKomik";
 import * as api from "../lib/api/comics";
@@ -26,6 +26,8 @@ const ONE_PIECE: Comic = {
   latest_chapter: 1120,
   status: "ongoing",
   cover_url: null,
+  read_url: null,
+  release_day: null,
   created_at: "2026-01-01T00:00:00.000Z",
   updated_at: "2026-01-01T00:00:00.000Z",
 };
@@ -39,9 +41,16 @@ const BERSERK: Comic = {
   latest_chapter: 364,
   status: "ongoing",
   cover_url: null,
+  read_url: null,
+  release_day: null,
   created_at: "2026-01-02T00:00:00.000Z",
   updated_at: "2026-01-02T00:00:00.000Z",
 };
+
+/** Judul komik bisa muncul berkali-kali (hero/sidebar/grid) — scope ke grid saja. */
+function gridTitle(title: string): HTMLElement {
+  return within(screen.getByTestId("comic-grid")).getByText(title);
+}
 
 const fetchComicsMock = vi.mocked(api.fetchComics);
 const postComicMock = vi.mocked(api.postComic);
@@ -100,8 +109,7 @@ describe("DaftarKomik", () => {
 
     await waitFor(() => expect(screen.getAllByText("One Piece").length).toBeGreaterThan(0));
 
-    const titleElements = screen.getAllByText("One Piece");
-    await user.click(titleElements[titleElements.length - 1]);
+    await user.click(gridTitle("One Piece"));
     await user.click(screen.getByRole("button", { name: `Edit ${ONE_PIECE.title}` }));
 
     expect(await screen.findByText(`Edit Komik — ${ONE_PIECE.title}`)).toBeInTheDocument();
@@ -128,7 +136,9 @@ describe("DaftarKomik", () => {
 
     await user.click(screen.getByRole("button", { name: /cari judul/i }));
     await user.type(screen.getByLabelText("Cari judul komik"), "berserk");
-    await user.click(screen.getByRole("button", { name: /berserk/i }));
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: /berserk/i }),
+    );
 
     expect(await screen.findByText(`Edit Komik — ${BERSERK.title}`)).toBeInTheDocument();
   });
@@ -141,8 +151,7 @@ describe("DaftarKomik", () => {
 
     await waitFor(() => expect(screen.getAllByText("One Piece").length).toBeGreaterThan(0));
 
-    const titleElements = screen.getAllByText("One Piece");
-    await user.click(titleElements[titleElements.length - 1]);
+    await user.click(gridTitle("One Piece"));
     await user.click(screen.getByRole("button", { name: `Edit ${ONE_PIECE.title}` }));
     await screen.findByText(`Edit Komik — ${ONE_PIECE.title}`);
 
@@ -168,10 +177,8 @@ describe("DaftarKomik", () => {
     await user.click(screen.getByRole("button", { name: "Pilih" }));
 
     // Pilih kedua komik dari grid (klik judul di dalam card).
-    const opTitles = screen.getAllByText("One Piece");
-    await user.click(opTitles[opTitles.length - 1]);
-    const bkTitles = screen.getAllByText("Berserk");
-    await user.click(bkTitles[bkTitles.length - 1]);
+    await user.click(gridTitle("One Piece"));
+    await user.click(gridTitle("Berserk"));
 
     expect(screen.getByText("2 dipilih")).toBeInTheDocument();
 

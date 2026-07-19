@@ -8,6 +8,10 @@ function toComic(doc: Comic & { user_id: string; _id?: unknown }): Comic {
   const comic = { ...doc };
   delete (comic as { user_id?: string }).user_id;
   delete (comic as { _id?: unknown })._id;
+  // Documents written before read_url/release_day existed have these fields
+  // missing entirely (Astra is schemaless) — normalize to null so the type stays honest.
+  comic.read_url = comic.read_url ?? null;
+  comic.release_day = comic.release_day ?? null;
   return comic;
 }
 
