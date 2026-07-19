@@ -136,6 +136,7 @@ export function AddComicForm({ onSubmit, onCancel }: AddComicFormProps) {
           <img
             src={coverUrl}
             alt="Preview cover"
+            referrerPolicy="no-referrer"
             className="h-32 w-24 rounded-md object-cover"
           />
         )}

@@ -59,6 +59,7 @@ export function SearchPalette({ comics, onSelect, onClose }: SearchPaletteProps)
                     <img
                       src={comic.cover_url}
                       alt=""
+                      referrerPolicy="no-referrer"
                       className="h-full w-full object-cover"
                     />
                   )}
