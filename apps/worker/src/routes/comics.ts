@@ -3,8 +3,26 @@ import type { Env } from "../env";
 import type { Comic, Status, TypeTag } from "../types/comic";
 import { TYPE_TAGS, STATUSES } from "../types/comic";
 import { getComicStore } from "../store/comicStore";
+import { rankCandidates } from "../store/fuzzyMatch";
 import { userAuth } from "../middleware/userAuth";
 import { rateLimit } from "../middleware/rateLimit";
+import { acquireMangaDexSlot } from "../durable-objects/RateLimiter";
+import { fetchMangaDexCover, fetchMangaDexInfo } from "../lib/mangadex";
+
+// Deterministic import path (no AI): score >= this means "same comic", so the
+// entry updates latest_chapter instead of creating a duplicate. Chosen higher
+// than the agent's ambiguity band since bulk import has no human in the loop
+// to resolve a borderline match.
+const BULK_MATCH_THRESHOLD = 0.85;
+
+// Cloudflare Workers cap subrequests per invocation (50 on the free plan).
+// Each written comic and each MangaDex lookup is one subrequest, so chunk
+// sizes are capped well under that ceiling.
+const MAX_BULK_ENTRIES = 25;
+const MAX_COVER_BACKFILL = 15;
+// Each title = 1 MangaDex fetch + 1 throttle subrequest, so 10 titles = 20,
+// safely under the 50/invocation ceiling.
+const MAX_DETECT_TITLES = 10;
 
 interface CreateComicBody {
   title?: unknown;
@@ -79,6 +97,209 @@ comics.post("/", async (c) => {
     return c.json({ error: `Gagal menyimpan komik: ${message}` }, 500);
   }
   return c.json(comic, 201);
+});
+
+interface BulkEntry {
+  title?: unknown;
+  type_tag?: unknown;
+  is_adult?: unknown;
+  latest_chapter?: unknown;
+  status?: unknown;
+}
+
+interface BulkResultItem {
+  title: string;
+  action: "created" | "updated" | "skipped" | "error";
+  comic_id?: string;
+  reason?: string;
+}
+
+function validateBulkEntry(body: BulkEntry): string | null {
+  if (typeof body.title !== "string" || body.title.trim() === "") {
+    return "title wajib diisi";
+  }
+  if (typeof body.type_tag !== "string" || !TYPE_TAGS.includes(body.type_tag as TypeTag)) {
+    return `type_tag harus salah satu dari: ${TYPE_TAGS.join(", ")}`;
+  }
+  if (typeof body.is_adult !== "boolean") {
+    return "is_adult wajib boolean";
+  }
+  if (typeof body.latest_chapter !== "number" || Number.isNaN(body.latest_chapter)) {
+    return "latest_chapter wajib angka";
+  }
+  if (typeof body.status !== "string" || !STATUSES.includes(body.status as Status)) {
+    return `status harus salah satu dari: ${STATUSES.join(", ")}`;
+  }
+  return null;
+}
+
+// Deterministic bulk import from historical text data (SPEC.md §7) — no AI
+// involved, so it doesn't touch Gemini quota. See apps/web/src/lib/parseHistoris.ts
+// for the client-side parser that produces these entries.
+comics.post("/bulk", async (c) => {
+  const body = await c.req
+    .json<{ entries?: unknown }>()
+    .catch(() => ({}) as { entries?: unknown });
+  if (!Array.isArray(body.entries)) {
+    return c.json({ error: "entries harus array" }, 400);
+  }
+  if (body.entries.length === 0) {
+    return c.json({ error: "entries tidak boleh kosong" }, 400);
+  }
+  if (body.entries.length > MAX_BULK_ENTRIES) {
+    return c.json({ error: `entries maksimal ${MAX_BULK_ENTRIES} per request` }, 400);
+  }
+
+  const userId = c.get("userId");
+  const store = getComicStore(c.env);
+  // Fetch the existing list once for the whole chunk and match in memory —
+  // calling searchComics() per entry would multiply subrequests against Astra.
+  const existing = await store.listComics(userId);
+
+  const results: BulkResultItem[] = [];
+
+  for (const rawEntry of body.entries as BulkEntry[]) {
+    const error = validateBulkEntry(rawEntry);
+    if (error) {
+      results.push({ title: typeof rawEntry.title === "string" ? rawEntry.title : "?", action: "error", reason: error });
+      continue;
+    }
+
+    const entry = {
+      title: rawEntry.title as string,
+      type_tag: rawEntry.type_tag as TypeTag,
+      is_adult: rawEntry.is_adult as boolean,
+      latest_chapter: rawEntry.latest_chapter as number,
+      status: rawEntry.status as Status,
+    };
+
+    const [best] = rankCandidates(existing, entry.title, 1);
+
+    try {
+      if (best && best.score >= BULK_MATCH_THRESHOLD) {
+        const match = existing.find((c) => c.comic_id === best.comic_id)!;
+        if (entry.latest_chapter > match.latest_chapter) {
+          const updated = await store.updateComic(userId, match.comic_id, {
+            latest_chapter: entry.latest_chapter,
+            status: entry.status,
+          });
+          if (updated) {
+            match.latest_chapter = updated.latest_chapter;
+            match.status = updated.status;
+          }
+          results.push({ title: entry.title, action: "updated", comic_id: match.comic_id });
+        } else {
+          results.push({
+            title: entry.title,
+            action: "skipped",
+            comic_id: match.comic_id,
+            reason: "chapter impor tidak lebih tinggi dari yang tersimpan",
+          });
+        }
+        continue;
+      }
+
+      const now = new Date().toISOString();
+      const comic: Comic = {
+        comic_id: crypto.randomUUID(),
+        title: entry.title,
+        aliases: [],
+        type_tag: entry.type_tag,
+        is_adult: entry.is_adult,
+        latest_chapter: entry.latest_chapter,
+        status: entry.status,
+        cover_url: null,
+        created_at: now,
+        updated_at: now,
+      };
+      await store.insertComic(userId, comic);
+      existing.push(comic);
+      results.push({ title: entry.title, action: "created", comic_id: comic.comic_id });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      results.push({ title: entry.title, action: "error", reason: message });
+    }
+  }
+
+  return c.json({ results });
+});
+
+// Second pass: fetch MangaDex covers for comics created by bulk import
+// (which always start with cover_url: null). Kept separate from /bulk itself
+// so cover lookups don't compete with comic writes for the subrequest budget.
+comics.post("/backfill-covers", async (c) => {
+  const body = await c.req
+    .json<{ comic_ids?: unknown }>()
+    .catch(() => ({}) as { comic_ids?: unknown });
+  if (
+    !Array.isArray(body.comic_ids) ||
+    body.comic_ids.some((id: unknown) => typeof id !== "string")
+  ) {
+    return c.json({ error: "comic_ids harus array of string" }, 400);
+  }
+  if (body.comic_ids.length === 0) {
+    return c.json({ error: "comic_ids tidak boleh kosong" }, 400);
+  }
+  if (body.comic_ids.length > MAX_COVER_BACKFILL) {
+    return c.json({ error: `comic_ids maksimal ${MAX_COVER_BACKFILL} per request` }, 400);
+  }
+
+  const userId = c.get("userId");
+  const store = getComicStore(c.env);
+  const results: Array<{ comic_id: string; cover_url: string | null; reason?: string }> = [];
+
+  for (const comicId of body.comic_ids as string[]) {
+    const comic = await store.findComic(userId, comicId);
+    if (!comic) {
+      results.push({ comic_id: comicId, cover_url: null, reason: "comic tidak ditemukan" });
+      continue;
+    }
+
+    await acquireMangaDexSlot(c.env.RATE_LIMITER);
+    const coverUrl = await fetchMangaDexCover(comic.title);
+    if (coverUrl) {
+      await store.updateComic(userId, comicId, { cover_url: coverUrl });
+    }
+    results.push({ comic_id: comicId, cover_url: coverUrl, reason: coverUrl ? undefined : "tidak ditemukan di MangaDex" });
+  }
+
+  return c.json({ results });
+});
+
+// Auto-detect comic type from MangaDex for import lines where the user didn't
+// write (jenis). Type only — is_adult is NEVER auto-detected (SPEC.md §8: 18+
+// must be explicit from the user, not a system guess). Returns type_tag: null
+// when no confident match / unmapped language, so the UI can flag the line
+// instead of storing a guess. Does not touch comic data — placed under /comics
+// only to reuse the auth + rate-limit middleware.
+comics.post("/detect-type", async (c) => {
+  const body = await c.req
+    .json<{ titles?: unknown }>()
+    .catch(() => ({}) as { titles?: unknown });
+  if (!Array.isArray(body.titles) || body.titles.some((t: unknown) => typeof t !== "string")) {
+    return c.json({ error: "titles harus array of string" }, 400);
+  }
+  if (body.titles.length === 0) {
+    return c.json({ error: "titles tidak boleh kosong" }, 400);
+  }
+  if (body.titles.length > MAX_DETECT_TITLES) {
+    return c.json({ error: `titles maksimal ${MAX_DETECT_TITLES} per request` }, 400);
+  }
+
+  const results: Array<{ title: string; type_tag: TypeTag | null; reason?: string }> = [];
+  for (const title of body.titles as string[]) {
+    await acquireMangaDexSlot(c.env.RATE_LIMITER);
+    const info = await fetchMangaDexInfo(title);
+    if (!info) {
+      results.push({ title, type_tag: null, reason: "tidak ditemukan di MangaDex" });
+    } else if (!info.type_tag) {
+      results.push({ title, type_tag: null, reason: "jenis tidak dikenali dari bahasa asal" });
+    } else {
+      results.push({ title, type_tag: info.type_tag });
+    }
+  }
+
+  return c.json({ results });
 });
 
 comics.patch("/:id", async (c) => {

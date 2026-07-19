@@ -55,8 +55,13 @@ vi.mock("@datastax/astra-db-ts", () => {
       return doc;
     }
 
-    async deleteOne() {
-      return { deletedCount: 0 };
+    async deleteOne(filter: { user_id: string; comic_id: string }) {
+      const index = this.docs.findIndex(
+        (d) => d.user_id === filter.user_id && d.comic_id === filter.comic_id,
+      );
+      if (index === -1) return { deletedCount: 0 };
+      this.docs.splice(index, 1);
+      return { deletedCount: 1 };
     }
   }
 
@@ -129,12 +134,17 @@ function mockFetch(turns: Turn[], mangadexCover: string | null = "cover-file.jpg
       return geminiReply(typeof turn === "function" ? turn() : turn);
     }
     if (String(url).includes("api.mangadex.org")) {
+      // Echo the queried title back as the entry's title so it clears the
+      // similarity gate in fetchMangaDexInfo (matches the real API shape:
+      // attributes.title + originalLanguage).
+      const queried = decodeURIComponent(new URL(String(url)).searchParams.get("title") ?? "");
       return new Response(
         JSON.stringify({
           data: mangadexCover
             ? [
                 {
                   id: "manga-1",
+                  attributes: { title: { en: queried }, altTitles: [], originalLanguage: "ja" },
                   relationships: [
                     { type: "cover_art", attributes: { fileName: mangadexCover } },
                   ],
@@ -396,11 +406,94 @@ describe("/agent/process", () => {
     expect(logDocs[0]).toMatchObject({ ai_action: "ambiguous", confirmed: false });
   });
 
-  it("returns 502 when Gemini responds with an error status", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("bad key", { status: 400 })));
+  it("returns 502 with a plain-language message when the API key is rejected", async () => {
+    const fetchMock = vi.fn(async () => new Response("bad key", { status: 400 }));
+    vi.stubGlobal("fetch", fetchMock);
 
     const res = await request({ teks_input: "test", google_api_key: "salah" });
     expect(res.status).toBe(502);
+    expect((await res.json()) as { error: string }).toMatchObject({
+      error: expect.stringContaining("API key Gemini ditolak"),
+    });
+    // 4xx (other than 429) is the caller's fault — retrying is pointless.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("explains a 429 as an exhausted quota and does not retry it", async () => {
+    const fetchMock = vi.fn(async () => new Response("quota", { status: 429 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await request({ teks_input: "test", google_api_key: "gk-1" });
+    expect(res.status).toBe(502);
+    expect((await res.json()) as { error: string }).toMatchObject({
+      error: expect.stringContaining("Kuota harian"),
+    });
+    // Google asks for a ~57s wait on quota errors; an in-request retry can't help.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a transient 503 and succeeds", async () => {
+    let calls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        calls++;
+        if (calls === 1) return new Response("busy", { status: 503 });
+        return geminiReply([{ text: "berhasil setelah retry" }]);
+      }),
+    );
+
+    const res = await request({ teks_input: "test", google_api_key: "gk-1" });
+    expect(res.status).toBe(200);
+    expect((await res.json()) as { message: string }).toMatchObject({
+      message: "berhasil setelah retry",
+    });
+    expect(calls).toBe(2);
+  });
+
+  it("gives up after MAX_ATTEMPTS of 503", async () => {
+    const fetchMock = vi.fn(async () => new Response("busy", { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await request({ teks_input: "test", google_api_key: "gk-1" });
+    expect(res.status).toBe(502);
+    expect((await res.json()) as { error: string }).toMatchObject({
+      error: expect.stringContaining("sedang penuh"),
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("rolls back a comic created earlier this run when a later turn fails for good", async () => {
+    // Reproduces what was observed during real end-to-end testing: create
+    // succeeds, then Gemini fails (quota/503) before fetch-cover/set_cover/
+    // log_proses ever run — the comic must not be left behind as an orphan.
+    let turn = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (!String(url).includes("generativelanguage.googleapis.com")) {
+          throw new Error(`fetch tak terduga ke ${url}`);
+        }
+        turn++;
+        if (turn === 1) return geminiReply([call("cari_komik_mirip", { candidate_title: "One Piece" })]);
+        if (turn === 2) {
+          return geminiReply([
+            call("buat_entry_baru", {
+              title: "One Piece",
+              type_tag: "manga",
+              is_adult: false,
+              chapter: 3,
+            }),
+          ]);
+        }
+        // Every turn after the comic is created keeps failing (quota/high-demand).
+        return new Response("busy", { status: 503 });
+      }),
+    );
+
+    const res = await request({ teks_input: "baru baca One Piece ch3", google_api_key: "gk-1" });
+    expect(res.status).toBe(502);
+    expect(comicDocs).toHaveLength(0); // no orphan left behind
   });
 
   it("returns 502 when the Gemini request throws (network/timeout)", async () => {

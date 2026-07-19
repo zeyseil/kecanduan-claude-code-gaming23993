@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { TextEditor } from "../components/TextEditor";
+import { BulkImportPanel } from "../components/BulkImportPanel";
 import { processAgentText, type AgentResult } from "../lib/api/agent";
 import { getGoogleApiKey, setGoogleApiKey } from "../lib/storage";
 
 type Status = "idle" | "processing" | "success" | "error";
+type Mode = "ai" | "import";
 
 export function Tulis() {
+  const [mode, setMode] = useState<Mode>("ai");
   const [apiKey, setApiKey] = useState(() => getGoogleApiKey());
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<AgentResult | null>(null);
@@ -41,69 +44,100 @@ export function Tulis() {
     <div className="mx-auto max-w-3xl">
       <h1 className="mb-1 text-lg font-semibold text-slate-100">Tulis</h1>
       <p className="mb-4 text-sm text-slate-400">
-        Catat bacaan baru atau update chapter. Tekan Proses untuk mengirim ke AI agent.
+        Catat bacaan baru atau update chapter, atau impor data historis sekali jalan.
       </p>
 
-      <div className="mb-4 rounded-md border border-slate-700 bg-slate-800 p-3">
-        <label
-          htmlFor="google-api-key"
-          className="mb-1 block text-xs uppercase tracking-wide text-slate-400"
+      <div className="mb-4 flex gap-2">
+        <button
+          type="button"
+          onClick={() => setMode("ai")}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+            mode === "ai"
+              ? "bg-indigo-600 text-white"
+              : "border border-slate-700 text-slate-300 hover:bg-slate-800"
+          }`}
         >
-          Google API Key (Gemini)
-        </label>
-        <input
-          id="google-api-key"
-          type="password"
-          value={apiKey}
-          onChange={(e) => handleApiKeyChange(e.target.value)}
-          placeholder="AIza..."
-          className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none"
-        />
-        <p className="mt-1 text-xs text-slate-500">
-          Disimpan hanya di browser Anda, dikirim per-request ke AI agent. Dapatkan API key
-          gratis di{" "}
-          <a
-            href="https://aistudio.google.com/apikey"
-            target="_blank"
-            rel="noreferrer"
-            className="text-indigo-400 hover:underline"
-          >
-            aistudio.google.com/apikey
-          </a>
-          .
-        </p>
+          Tulis bebas
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("import")}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+            mode === "import"
+              ? "bg-indigo-600 text-white"
+              : "border border-slate-700 text-slate-300 hover:bg-slate-800"
+          }`}
+        >
+          Import historis
+        </button>
       </div>
 
-      <TextEditor onProcess={handleProcess} disabled={status === "processing"} />
-
-      {status === "error" && errorMsg && (
-        <div className="mt-4 rounded-md border border-rose-800 bg-rose-950/40 p-3 text-sm text-rose-300">
-          {errorMsg}
-        </div>
-      )}
-
-      {status === "success" && result !== null && (
-        <div className="mt-4 rounded-md border border-slate-700 bg-slate-800 p-3">
-          <p className="mb-1 text-xs uppercase tracking-wide text-slate-400">
-            Hasil dari AI agent
-          </p>
-          {result.message ? (
-            <p className="text-sm text-slate-100">{result.message}</p>
-          ) : (
-            <p className="text-sm text-slate-400">
-              AI tidak mengembalikan ringkasan teks — lihat detail langkah di bawah.
+      {mode === "ai" && (
+        <>
+          <div className="mb-4 rounded-md border border-slate-700 bg-slate-800 p-3">
+            <label
+              htmlFor="google-api-key"
+              className="mb-1 block text-xs uppercase tracking-wide text-slate-400"
+            >
+              Google API Key (Gemini)
+            </label>
+            <input
+              id="google-api-key"
+              type="password"
+              value={apiKey}
+              onChange={(e) => handleApiKeyChange(e.target.value)}
+              placeholder="AIza..."
+              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Disimpan hanya di browser Anda, dikirim per-request ke AI agent. Dapatkan API key
+              gratis di{" "}
+              <a
+                href="https://aistudio.google.com/apikey"
+                target="_blank"
+                rel="noreferrer"
+                className="text-indigo-400 hover:underline"
+              >
+                aistudio.google.com/apikey
+              </a>
+              .
             </p>
+          </div>
+
+          <TextEditor onProcess={handleProcess} disabled={status === "processing"} />
+
+          {status === "error" && errorMsg && (
+            <div className="mt-4 rounded-md border border-rose-800 bg-rose-950/40 p-3 text-sm text-rose-300">
+              {errorMsg}
+            </div>
           )}
-          <details className="mt-2">
-            <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-400">
-              Lihat detail langkah ({result.tool_calls.length} tool dipanggil)
-            </summary>
-            <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-slate-300">
-              {JSON.stringify(result, null, 2)}
-            </pre>
-          </details>
-        </div>
+
+          {status === "success" && result !== null && (
+            <div className="mt-4 rounded-md border border-slate-700 bg-slate-800 p-3">
+              <p className="mb-1 text-xs uppercase tracking-wide text-slate-400">
+                Hasil dari AI agent
+              </p>
+              {result.message ? (
+                <p className="text-sm text-slate-100">{result.message}</p>
+              ) : (
+                <p className="text-sm text-slate-400">
+                  AI tidak mengembalikan ringkasan teks — lihat detail langkah di bawah.
+                </p>
+              )}
+              <details className="mt-2">
+                <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-400">
+                  Lihat detail langkah ({result.tool_calls.length} tool dipanggil)
+                </summary>
+                <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-slate-300">
+                  {JSON.stringify(result, null, 2)}
+                </pre>
+              </details>
+            </div>
+          )}
+        </>
       )}
+
+      {mode === "import" && <BulkImportPanel />}
     </div>
   );
 }
