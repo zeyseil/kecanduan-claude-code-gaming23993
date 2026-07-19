@@ -6,10 +6,11 @@ import * as agentApi from "../lib/api/agent";
 
 vi.mock("../lib/api/agent", async () => {
   const actual = await vi.importActual<typeof agentApi>("../lib/api/agent");
-  return { ...actual, processAgentText: vi.fn() };
+  return { ...actual, processAgentText: vi.fn(), fetchGeminiModels: vi.fn() };
 });
 
 const processAgentTextMock = vi.mocked(agentApi.processAgentText);
+const fetchGeminiModelsMock = vi.mocked(agentApi.fetchGeminiModels);
 
 function fakeLocalStorage(): Storage {
   const store = new Map<string, string>();
@@ -31,6 +32,8 @@ function fakeLocalStorage(): Storage {
 
 beforeEach(() => {
   processAgentTextMock.mockReset();
+  fetchGeminiModelsMock.mockReset();
+  fetchGeminiModelsMock.mockResolvedValue([]);
   vi.stubGlobal("localStorage", fakeLocalStorage());
 });
 
@@ -46,7 +49,7 @@ describe("Tulis", () => {
     await user.type(screen.getByLabelText(/editor catatan komik/i), "baru baca naruto ch56");
     await user.click(screen.getByRole("button", { name: /proses dengan ai/i }));
 
-    expect(await screen.findByText(/isi api key gemini/i)).toBeInTheDocument();
+    expect(await screen.findByText(/isi api key gemini dulu sebelum memproses/i)).toBeInTheDocument();
     expect(processAgentTextMock).not.toHaveBeenCalled();
   });
 
@@ -88,10 +91,20 @@ describe("Tulis", () => {
 
   it("mengirim model pilihan user saat memproses", async () => {
     processAgentTextMock.mockResolvedValue({ message: "ok", tool_calls: [] });
+    fetchGeminiModelsMock.mockResolvedValue([
+      { id: "gemini-2.5-flash", label: "Flash 2.5", note: "", quota: null, curated: true },
+    ]);
     const user = userEvent.setup();
     render(<Tulis />);
 
     await user.type(screen.getByLabelText(/google api key/i), "AIzaTestKey");
+
+    // Model auto-loads on a debounce (600ms) after the API key settles — wait
+    // for the real option to appear before selecting it.
+    await waitFor(
+      () => expect(screen.getByRole("option", { name: /flash 2\.5/i })).toBeInTheDocument(),
+      { timeout: 2000 },
+    );
     await user.selectOptions(screen.getByLabelText(/model gemini/i), "gemini-2.5-flash");
     await user.type(screen.getByLabelText(/editor catatan komik/i), "baru baca naruto ch56");
     await user.click(screen.getByRole("button", { name: /proses dengan ai/i }));

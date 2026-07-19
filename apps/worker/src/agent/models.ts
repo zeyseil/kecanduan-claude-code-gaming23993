@@ -94,6 +94,7 @@ const EXCLUDED_FRAGMENTS = [
   "live",
   "vision",
   "veo",
+  "computer-use",
 ];
 
 export function isSuitableForAgent(model: ListedModel): boolean {

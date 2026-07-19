@@ -44,7 +44,13 @@ describe("isSuitableForAgent", () => {
   });
 
   it("rejects excluded variants even if they are gemini + generateContent", () => {
-    for (const id of ["gemini-embedding-001", "gemini-tts", "gemini-live-2.5", "imagen-3"]) {
+    for (const id of [
+      "gemini-embedding-001",
+      "gemini-tts",
+      "gemini-live-2.5",
+      "imagen-3",
+      "gemini-2.5-computer-use-preview-10-2025",
+    ]) {
       expect(
         isSuitableForAgent({ name: `models/${id}`, supportedGenerationMethods: ["generateContent"] }),
       ).toBe(false);
