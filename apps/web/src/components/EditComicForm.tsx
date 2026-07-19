@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { Comic, TypeTag } from "../types/comic";
-import { TYPE_TAGS } from "../types/comic";
+import { RELEASE_DAY_LABELS, TYPE_TAGS } from "../types/comic";
 import type { ComicPatch } from "../lib/api/comics";
 import { readFileAsDataUrl } from "../lib/cropImage";
 import { CoverDropzone } from "./CoverDropzone";
@@ -24,6 +24,10 @@ export function EditComicForm({ comic, onSubmit, onDelete, onCancel }: EditComic
   const [typeTag, setTypeTag] = useState<TypeTag>(comic.type_tag);
   const [isAdult, setIsAdult] = useState(comic.is_adult);
   const [chapter, setChapter] = useState(String(comic.latest_chapter));
+  const [readUrl, setReadUrl] = useState(comic.read_url ?? "");
+  const [releaseDay, setReleaseDay] = useState(
+    comic.release_day === null ? "" : String(comic.release_day),
+  );
   const [coverUrl, setCoverUrl] = useState<string | null>(comic.cover_url);
   const [pendingCropSrc, setPendingCropSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +71,8 @@ export function EditComicForm({ comic, onSubmit, onDelete, onCancel }: EditComic
         is_adult: isAdult,
         latest_chapter: chapterValue,
         cover_url: coverUrl,
+        read_url: readUrl.trim() || null,
+        release_day: releaseDay === "" ? null : Number(releaseDay),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal menyimpan komik.");
@@ -171,6 +177,33 @@ export function EditComicForm({ comic, onSubmit, onDelete, onCancel }: EditComic
             onChange={(e) => setChapter(e.target.value)}
             className="rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 focus:border-indigo-500 focus:outline-none"
           />
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm text-slate-300">
+          Link Baca (opsional)
+          <input
+            type="url"
+            value={readUrl}
+            onChange={(e) => setReadUrl(e.target.value)}
+            placeholder="https://…"
+            className="rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 focus:border-indigo-500 focus:outline-none"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm text-slate-300">
+          Hari Rilis (opsional)
+          <select
+            value={releaseDay}
+            onChange={(e) => setReleaseDay(e.target.value)}
+            className="rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 focus:border-indigo-500 focus:outline-none"
+          >
+            <option value="">Tidak tentu</option>
+            {RELEASE_DAY_LABELS.map((label, index) => (
+              <option key={label} value={index}>
+                {label}
+              </option>
+            ))}
+          </select>
         </label>
 
         <CoverDropzone

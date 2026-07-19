@@ -49,7 +49,7 @@ export function Toolbar({
       <button
         type="button"
         onClick={onOpenSearch}
-        className="flex items-center justify-between gap-2 rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-400 hover:border-indigo-500 hover:text-slate-200 sm:min-w-[200px]"
+        className="flex items-center justify-between gap-2 rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-400 hover:border-indigo-500 hover:text-slate-200 sm:flex-1"
       >
         <span>Cari judul…</span>
         <kbd className="rounded border border-slate-600 px-1.5 py-0.5 text-[10px] text-slate-500">

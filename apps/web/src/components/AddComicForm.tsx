@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { TypeTag } from "../types/comic";
-import { TYPE_TAGS } from "../types/comic";
+import { RELEASE_DAY_LABELS, TYPE_TAGS } from "../types/comic";
 import type { NewComicInput } from "../lib/api/comics";
 import { readFileAsDataUrl } from "../lib/cropImage";
 import { CoverDropzone } from "./CoverDropzone";
@@ -22,6 +22,8 @@ export function AddComicForm({ onSubmit, onCancel }: AddComicFormProps) {
   const [typeTag, setTypeTag] = useState<TypeTag>("manga");
   const [isAdult, setIsAdult] = useState(false);
   const [chapter, setChapter] = useState("");
+  const [readUrl, setReadUrl] = useState("");
+  const [releaseDay, setReleaseDay] = useState("");
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [pendingCropSrc, setPendingCropSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +65,8 @@ export function AddComicForm({ onSubmit, onCancel }: AddComicFormProps) {
         is_adult: isAdult,
         latest_chapter: chapterValue,
         cover_url: coverUrl,
+        read_url: readUrl.trim() || null,
+        release_day: releaseDay === "" ? null : Number(releaseDay),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal menyimpan komik.");
@@ -124,6 +128,33 @@ export function AddComicForm({ onSubmit, onCancel }: AddComicFormProps) {
             onChange={(e) => setChapter(e.target.value)}
             className="rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 focus:border-indigo-500 focus:outline-none"
           />
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm text-slate-300">
+          Link Baca (opsional)
+          <input
+            type="url"
+            value={readUrl}
+            onChange={(e) => setReadUrl(e.target.value)}
+            placeholder="https://…"
+            className="rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 focus:border-indigo-500 focus:outline-none"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm text-slate-300">
+          Hari Rilis (opsional)
+          <select
+            value={releaseDay}
+            onChange={(e) => setReleaseDay(e.target.value)}
+            className="rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 focus:border-indigo-500 focus:outline-none"
+          >
+            <option value="">Tidak tentu</option>
+            {RELEASE_DAY_LABELS.map((label, index) => (
+              <option key={label} value={index}>
+                {label}
+              </option>
+            ))}
+          </select>
         </label>
 
         <CoverDropzone

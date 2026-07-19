@@ -152,6 +152,8 @@ const buatEntryBaru: AgentTool = {
       latest_chapter: chapter,
       status: status ?? ("ongoing" as Status),
       cover_url: null,
+      read_url: null,
+      release_day: null,
       created_at: now,
       updated_at: now,
     };

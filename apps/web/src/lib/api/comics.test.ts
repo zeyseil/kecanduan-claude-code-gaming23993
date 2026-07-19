@@ -11,6 +11,8 @@ const SAMPLE: Comic = {
   latest_chapter: 1,
   status: "ongoing",
   cover_url: null,
+  read_url: null,
+  release_day: null,
   created_at: "2026-01-01T00:00:00.000Z",
   updated_at: "2026-01-01T00:00:00.000Z",
 };
@@ -97,6 +99,8 @@ describe("postComic", () => {
       is_adult: false,
       latest_chapter: 1,
       cover_url: null,
+      read_url: null,
+      release_day: null,
     });
 
     expect(result).toEqual(SAMPLE);
@@ -126,6 +130,8 @@ describe("postComic", () => {
         is_adult: false,
         latest_chapter: 1,
         cover_url: null,
+        read_url: null,
+        release_day: null,
       }),
     ).rejects.toThrow("title wajib diisi");
   });

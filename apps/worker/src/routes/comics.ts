@@ -34,6 +34,25 @@ interface CreateComicBody {
   latest_chapter?: unknown;
   status?: unknown;
   cover_url?: unknown;
+  read_url?: unknown;
+  release_day?: unknown;
+}
+
+// http/https only — this value gets rendered as <a href> on the client, so a
+// javascript: scheme would be a stored-XSS vector.
+function isValidReadUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  if (value === "") return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function isValidReleaseDay(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 6;
 }
 
 function validateCreateBody(body: CreateComicBody): string | null {
@@ -57,6 +76,12 @@ function validateCreateBody(body: CreateComicBody): string | null {
   }
   if (body.cover_url !== undefined && body.cover_url !== null && typeof body.cover_url !== "string") {
     return "cover_url harus string atau null";
+  }
+  if (body.read_url !== undefined && body.read_url !== null && !isValidReadUrl(body.read_url)) {
+    return "read_url harus URL http/https, string kosong, atau null";
+  }
+  if (body.release_day !== undefined && body.release_day !== null && !isValidReleaseDay(body.release_day)) {
+    return "release_day harus angka 0-6 atau null";
   }
   return null;
 }
@@ -87,6 +112,8 @@ comics.post("/", async (c) => {
     latest_chapter: body.latest_chapter as number,
     status: body.status as Status,
     cover_url: (body.cover_url as string | null | undefined) ?? null,
+    read_url: (body.read_url as string | null | undefined) || null,
+    release_day: (body.release_day as number | null | undefined) ?? null,
     created_at: now,
     updated_at: now,
   };
@@ -211,6 +238,8 @@ comics.post("/bulk", async (c) => {
         latest_chapter: entry.latest_chapter,
         status: entry.status,
         cover_url: null,
+        read_url: null,
+        release_day: null,
         created_at: now,
         updated_at: now,
       };
@@ -389,6 +418,18 @@ comics.patch("/:id", async (c) => {
       return c.json({ error: "cover_url harus string atau null" }, 400);
     }
     patch.cover_url = body.cover_url as string | null;
+  }
+  if (body.read_url !== undefined) {
+    if (body.read_url !== null && !isValidReadUrl(body.read_url)) {
+      return c.json({ error: "read_url harus URL http/https, string kosong, atau null" }, 400);
+    }
+    patch.read_url = (body.read_url as string | null) || null;
+  }
+  if (body.release_day !== undefined) {
+    if (body.release_day !== null && !isValidReleaseDay(body.release_day)) {
+      return c.json({ error: "release_day harus angka 0-6 atau null" }, 400);
+    }
+    patch.release_day = body.release_day as number | null;
   }
 
   try {

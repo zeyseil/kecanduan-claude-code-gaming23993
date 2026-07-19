@@ -47,8 +47,13 @@ export function App() {
 function Shell({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute -left-40 -top-40 h-96 w-96 rounded-full bg-indigo-500/10 blur-3xl" />
+        <div className="absolute -right-40 top-1/3 h-96 w-96 rounded-full bg-violet-500/10 blur-3xl" />
+      </div>
+
       <header className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
           <AppLogo className="h-7 w-7" />
           <span className="text-base font-bold text-indigo-400">
             Komik Tracker
@@ -69,7 +74,7 @@ function Shell({ isAdmin }: { isAdmin: boolean }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-5">
+      <main className="mx-auto max-w-7xl px-4 py-5">
         <Routes>
           <Route
             path="/"

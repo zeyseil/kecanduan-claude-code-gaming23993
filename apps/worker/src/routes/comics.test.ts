@@ -187,6 +187,105 @@ describe("/comics", () => {
     expect(patched.is_adult).toBe(true);
   });
 
+  it("accepts read_url and release_day on create, defaulting to null when omitted", async () => {
+    const withFields = await request("/comics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Chainsaw Man",
+        type_tag: "manga",
+        is_adult: false,
+        latest_chapter: 1,
+        status: "ongoing",
+        read_url: "https://example.com/read/csm",
+        release_day: 2,
+      }),
+    });
+    expect(withFields.status).toBe(201);
+    const createdWithFields = (await withFields.json()) as Comic;
+    expect(createdWithFields.read_url).toBe("https://example.com/read/csm");
+    expect(createdWithFields.release_day).toBe(2);
+
+    const withoutFields = await request("/comics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Jujutsu Kaisen",
+        type_tag: "manga",
+        is_adult: false,
+        latest_chapter: 1,
+        status: "ongoing",
+      }),
+    });
+    const createdWithoutFields = (await withoutFields.json()) as Comic;
+    expect(createdWithoutFields.read_url).toBeNull();
+    expect(createdWithoutFields.release_day).toBeNull();
+  });
+
+  it("rejects a read_url with a non-http(s) scheme", async () => {
+    const res = await request("/comics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Malicious",
+        type_tag: "manga",
+        is_adult: false,
+        latest_chapter: 1,
+        status: "ongoing",
+        read_url: "javascript:alert(1)",
+      }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects a release_day outside 0-6", async () => {
+    const res = await request("/comics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Out of range",
+        type_tag: "manga",
+        is_adult: false,
+        latest_chapter: 1,
+        status: "ongoing",
+        release_day: 7,
+      }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("patches read_url and release_day, rejecting an invalid read_url", async () => {
+    const createRes = await request("/comics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Vinland Saga",
+        type_tag: "manga",
+        is_adult: false,
+        latest_chapter: 1,
+        status: "ongoing",
+      }),
+    });
+    const created = (await createRes.json()) as Comic;
+
+    const patchRes = await request(`/comics/${created.comic_id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ read_url: "https://example.com/read/vs", release_day: 4 }),
+    });
+    expect(patchRes.status).toBe(200);
+    const patched = (await patchRes.json()) as Comic;
+    expect(patched.read_url).toBe("https://example.com/read/vs");
+    expect(patched.release_day).toBe(4);
+
+    const badPatchRes = await request(`/comics/${created.comic_id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ read_url: "not-a-url" }),
+    });
+    expect(badPatchRes.status).toBe(400);
+  });
+
   it("returns 404 when deleting a missing comic", async () => {
     const res = await request("/comics/missing-id", { method: "DELETE" });
     expect(res.status).toBe(404);
@@ -212,6 +311,30 @@ describe("/comics", () => {
     const listRes = await request("/comics");
     const list = (await listRes.json()) as Comic[];
     expect(list).toEqual([]);
+  });
+
+  it("normalizes legacy documents missing read_url/release_day to null (backward-compat)", async () => {
+    // Simulates a document written before these fields existed — Astra is
+    // schemaless, so the field is just absent, not null.
+    const legacyDoc = {
+      comic_id: "legacy-1",
+      title: "Old Comic",
+      aliases: [],
+      type_tag: "manga",
+      is_adult: false,
+      latest_chapter: 5,
+      status: "ongoing",
+      cover_url: null,
+      created_at: "2025-01-01T00:00:00.000Z",
+      updated_at: "2025-01-01T00:00:00.000Z",
+      user_id: "demo-user",
+    } as unknown as ComicDocument;
+    documents.push(legacyDoc);
+
+    const list = (await (await request("/comics")).json()) as Comic[];
+    expect(list).toHaveLength(1);
+    expect(list[0].read_url).toBeNull();
+    expect(list[0].release_day).toBeNull();
   });
 
   describe("POST /comics/bulk-delete", () => {

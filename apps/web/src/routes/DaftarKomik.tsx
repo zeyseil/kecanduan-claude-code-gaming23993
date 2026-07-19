@@ -24,6 +24,10 @@ import { AddComicForm } from "../components/AddComicForm";
 import { EditComicForm } from "../components/EditComicForm";
 import { SearchPalette } from "../components/SearchPalette";
 import { BulkDeleteConfirm } from "../components/BulkDeleteConfirm";
+import { HeroBanner } from "../components/HeroBanner";
+import { StatsPanel } from "../components/StatsPanel";
+import { ActivityPanel } from "../components/ActivityPanel";
+import { ReleaseSchedule } from "../components/ReleaseSchedule";
 
 const RECENT_LIMIT = 8;
 
@@ -173,29 +177,44 @@ export function DaftarKomik() {
       )}
 
       {loadStatus === "ready" && (
-        <>
-          {!isSearching && <RecentStrip comics={recent} />}
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-6">
+          <div>
+            <Toolbar
+              options={options}
+              onChange={setOptions}
+              onOpenSearch={() => setShowSearchPalette(true)}
+              onExport={() => downloadMarkdown(comics)}
+              canExport={comics.length > 0}
+              onToggleSelect={selectMode ? exitSelectMode : enterSelectMode}
+              selectMode={selectMode}
+            />
 
-          <Toolbar
-            options={options}
-            onChange={setOptions}
-            onOpenSearch={() => setShowSearchPalette(true)}
-            onExport={() => downloadMarkdown(comics)}
-            canExport={comics.length > 0}
-            onToggleSelect={selectMode ? exitSelectMode : enterSelectMode}
-            selectMode={selectMode}
-          />
-          <SectionHeader title="Semua Komik" count={visible.length} />
-          <ComicGrid
-            comics={visible}
-            pressedComicId={pressedComicId}
-            onPress={handlePress}
-            onEdit={handleEditOpen}
-            selectMode={selectMode}
-            selectedIds={selectedIds}
-            onToggleSelect={handleToggleSelect}
-          />
-        </>
+            <HeroBanner comics={comics} onEdit={handleEditOpen} />
+
+            <div className="lg:hidden">
+              <StatsPanel comics={comics} variant="compact" />
+            </div>
+
+            {!isSearching && <RecentStrip comics={recent} />}
+
+            <SectionHeader title="Semua Komik" count={visible.length} />
+            <ComicGrid
+              comics={visible}
+              pressedComicId={pressedComicId}
+              onPress={handlePress}
+              onEdit={handleEditOpen}
+              selectMode={selectMode}
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
+            />
+          </div>
+
+          <aside className="hidden lg:flex lg:flex-col lg:gap-4">
+            <StatsPanel comics={comics} variant="sidebar" />
+            <ActivityPanel comics={comics} onEdit={handleEditOpen} />
+            <ReleaseSchedule comics={comics} onEdit={handleEditOpen} />
+          </aside>
+        </div>
       )}
 
       {selectMode && (

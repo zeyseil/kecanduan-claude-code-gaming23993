@@ -49,6 +49,8 @@ describe("AddComicForm", () => {
       is_adult: true,
       latest_chapter: 12.5,
       cover_url: null,
+      read_url: null,
+      release_day: null,
     });
   });
 
