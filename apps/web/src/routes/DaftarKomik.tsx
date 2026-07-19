@@ -31,14 +31,19 @@ import { ReleaseSchedule } from "../components/ReleaseSchedule";
 import { SkeletonGrid, SkeletonHero, SkeletonPanel } from "../components/Skeletons";
 import { ContinueReadingPrompt } from "../components/ContinueReadingPrompt";
 import { takeReadingSession } from "../lib/readingSession";
+import { readComicCache, writeComicCache } from "../lib/comicCache";
 
 const RECENT_LIMIT = 8;
 
 type LoadStatus = "loading" | "ready" | "error";
 
 export function DaftarKomik() {
-  const [comics, setComics] = useState<Comic[]>([]);
-  const [loadStatus, setLoadStatus] = useState<LoadStatus>("loading");
+  // Stale-while-revalidate: mulai dari cache localStorage kalau ada — data
+  // langsung tampil (tanpa skeleton), lalu fetch di useEffect menggantikannya.
+  const [comics, setComics] = useState<Comic[]>(() => readComicCache() ?? []);
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>(() =>
+    readComicCache() ? "ready" : "loading",
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [options, setOptions] = useState<ComicListOptions>(DEFAULT_OPTIONS);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -76,23 +81,34 @@ export function DaftarKomik() {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, []);
 
-  const loadComics = () => {
-    setLoadStatus("loading");
-    setLoadError(null);
+  const loadComics = (background = false) => {
+    // Refresh background (ada data cache yang sudah tampil): jangan tampilkan
+    // skeleton, dan kalau gagal biarkan data cache tetap tampil (silent).
+    if (!background) {
+      setLoadStatus("loading");
+      setLoadError(null);
+    }
     fetchComics()
       .then((result) => {
         setComics(result);
         setLoadStatus("ready");
       })
       .catch((err: unknown) => {
+        if (background) return;
         setLoadError(err instanceof Error ? err.message : "Gagal memuat komik.");
         setLoadStatus("error");
       });
   };
 
   useEffect(() => {
-    loadComics();
+    loadComics(readComicCache() !== null);
   }, []);
+
+  // Satu titik tulis cache untuk semua mutasi (add/edit/delete/bulk/toggle) —
+  // hanya saat ready supaya state awal kosong tidak menimpa cache yang ada.
+  useEffect(() => {
+    if (loadStatus === "ready") writeComicCache(comics);
+  }, [comics, loadStatus]);
 
   const visible = useMemo(() => selectComics(comics, options), [comics, options]);
   const recent = useMemo(() => selectRecent(comics, RECENT_LIMIT), [comics]);
@@ -210,7 +226,7 @@ export function DaftarKomik() {
           <p className="text-sm text-rose-400">{loadError}</p>
           <button
             type="button"
-            onClick={loadComics}
+            onClick={() => loadComics()}
             className="rounded-md bg-slate-700 px-3 py-1.5 text-sm text-slate-100 hover:bg-slate-600"
           >
             Coba lagi

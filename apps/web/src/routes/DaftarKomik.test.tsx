@@ -37,6 +37,7 @@ const ONE_PIECE: Comic = {
   cover_url: null,
   read_url: null,
   release_day: null,
+  note: null,
   created_at: "2026-01-01T00:00:00.000Z",
   updated_at: "2026-01-01T00:00:00.000Z",
 };
@@ -52,6 +53,7 @@ const BERSERK: Comic = {
   cover_url: null,
   read_url: null,
   release_day: null,
+  note: null,
   created_at: "2026-01-02T00:00:00.000Z",
   updated_at: "2026-01-02T00:00:00.000Z",
 };
@@ -67,7 +69,19 @@ const patchComicMock = vi.mocked(api.patchComic);
 const deleteComicMock = vi.mocked(api.deleteComic);
 const bulkDeleteComicsMock = vi.mocked(api.bulkDeleteComics);
 
+/** Stub localStorage per test (pola storage.test.ts) supaya cache komik
+ * (lib/comicCache.ts) deterministik dan tidak bocor antar test. */
+function makeFakeStorage() {
+  const store = new Map<string, string>();
+  return {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => void store.set(key, value),
+    removeItem: (key: string) => void store.delete(key),
+  };
+}
+
 beforeEach(() => {
+  vi.stubGlobal("localStorage", makeFakeStorage());
   fetchComicsMock.mockReset();
   postComicMock.mockReset();
   patchComicMock.mockReset();
@@ -83,6 +97,30 @@ describe("DaftarKomik", () => {
     expect(screen.getAllByTestId("skeleton-grid").length).toBeGreaterThan(0);
 
     await waitFor(() => expect(screen.getAllByText("One Piece").length).toBeGreaterThan(0));
+  });
+
+  it("merender data cache seketika tanpa skeleton, lalu diganti hasil fetch (stale-while-revalidate)", async () => {
+    globalThis.localStorage.setItem("komik-tracker:comics-cache", JSON.stringify([ONE_PIECE]));
+    fetchComicsMock.mockResolvedValue([ONE_PIECE, BERSERK]);
+    render(<DaftarKomik />);
+
+    // Data cache langsung tampil — tidak ada skeleton sama sekali.
+    expect(screen.queryByTestId("skeleton-grid")).toBeNull();
+    expect(gridTitle("One Piece")).toBeInTheDocument();
+
+    // Hasil server menggantikan cache diam-diam.
+    await waitFor(() => expect(gridTitle("Berserk")).toBeInTheDocument());
+  });
+
+  it("refresh background yang gagal membiarkan data cache tetap tampil (bukan layar error)", async () => {
+    globalThis.localStorage.setItem("komik-tracker:comics-cache", JSON.stringify([ONE_PIECE]));
+    fetchComicsMock.mockRejectedValue(new Error("Worker tidak merespons"));
+    render(<DaftarKomik />);
+
+    expect(gridTitle("One Piece")).toBeInTheDocument();
+    await waitFor(() => expect(fetchComicsMock).toHaveBeenCalled());
+    expect(screen.queryByText("Worker tidak merespons")).toBeNull();
+    expect(gridTitle("One Piece")).toBeInTheDocument();
   });
 
   it("menampilkan pesan error dan tombol coba lagi saat fetch gagal", async () => {

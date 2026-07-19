@@ -16,8 +16,7 @@ import type { AiAction } from "../types/processLog";
 import { AI_ACTIONS } from "../types/processLog";
 import { getComicStore } from "../store/comicStore";
 import { getProcessLogStore } from "../store/processLogStore";
-import { acquireMangaDexSlot } from "../durable-objects/RateLimiter";
-import { fetchMangaDexCover } from "../lib/mangadex";
+import { fetchComicInfo } from "../lib/comicInfo";
 import type { FunctionDeclaration } from "./geminiClient";
 
 export interface ToolContext {
@@ -154,6 +153,8 @@ const buatEntryBaru: AgentTool = {
       cover_url: null,
       read_url: null,
       release_day: null,
+      // note is user-authored only — the agent never fills it (same rule as read_url).
+      note: null,
       created_at: now,
       updated_at: now,
     };
@@ -209,7 +210,7 @@ const cariCoverMangadex: AgentTool = {
   declaration: {
     name: "cari_cover_mangadex",
     description:
-      "Cari cover komik dari MangaDex. Hanya MENCARI URL-nya, TIDAK menyimpan — panggil set_cover setelahnya kalau hasilnya tidak null.",
+      "Cari cover komik dari MangaDex (fallback otomatis ke AniList). Hanya MENCARI URL-nya, TIDAK menyimpan — panggil set_cover setelahnya kalau hasilnya tidak null.",
     parameters: {
       type: "OBJECT",
       properties: {
@@ -222,10 +223,10 @@ const cariCoverMangadex: AgentTool = {
     const title = asString(args.title);
     if (!title) return { error: "title wajib diisi" };
 
-    // Global <=5 req/s throttle across the whole Worker (MangaDex limits per IP,
-    // not per user), so this queues briefly rather than failing.
-    await acquireMangaDexSlot(ctx.env.RATE_LIMITER);
-    return { cover_url: await fetchMangaDexCover(title) };
+    // fetchComicInfo acquires the per-source rate-limit slots itself
+    // (MangaDex first, AniList fallback) — no extra throttle needed here.
+    const info = await fetchComicInfo(title, ctx.env);
+    return { cover_url: info?.cover_url ?? null, source: info?.source ?? null };
   },
 };
 

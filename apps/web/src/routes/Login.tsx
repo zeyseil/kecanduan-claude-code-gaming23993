@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { setAuthToken } from "../lib/storage";
+import { clearComicCache } from "../lib/comicCache";
 import { AppLogo } from "../components/AppLogo";
 
 /**
@@ -40,6 +41,8 @@ export function Login() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (token.trim() === "") return;
+    // Token baru bisa milik user berbeda — buang cache komik user sebelumnya.
+    clearComicCache();
     setAuthToken(token.trim());
     navigate("/", { replace: true });
   };

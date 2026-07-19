@@ -335,6 +335,46 @@ describe("/comics", () => {
     expect(list).toHaveLength(1);
     expect(list[0].read_url).toBeNull();
     expect(list[0].release_day).toBeNull();
+    expect(list[0].note).toBeNull();
+  });
+
+  it("accepts note on create and patch, rejecting one over 500 chars", async () => {
+    const createRes = await request("/comics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Noted Comic",
+        type_tag: "manhwa",
+        is_adult: false,
+        latest_chapter: 1,
+        status: "ongoing",
+        note: "  hiatus  ",
+      }),
+    });
+    expect(createRes.status).toBe(201);
+    const created = (await createRes.json()) as Comic;
+    expect(created.note).toBe("hiatus");
+
+    const patchRes = await request(`/comics/${created.comic_id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note: "S1 end" }),
+    });
+    expect(((await patchRes.json()) as Comic).note).toBe("S1 end");
+
+    const tooLong = await request(`/comics/${created.comic_id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note: "x".repeat(501) }),
+    });
+    expect(tooLong.status).toBe(400);
+
+    const cleared = await request(`/comics/${created.comic_id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note: null }),
+    });
+    expect(((await cleared.json()) as Comic).note).toBeNull();
   });
 
   describe("POST /comics/bulk-delete", () => {
@@ -598,6 +638,20 @@ describe("/comics", () => {
       expect(body.results[0].action).toBe("created");
       expect(body.results[1].action).toBe("error");
     });
+
+    it("stores the parser's note on created comics", async () => {
+      const res = await request("/comics/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: [
+            { title: "Comic Hiatus", type_tag: "manhwa", is_adult: false, latest_chapter: 45, status: "ongoing", note: "hiatus" },
+          ],
+        }),
+      });
+      expect(res.status).toBe(200);
+      expect(documents[0].note).toBe("hiatus");
+    });
   });
 
   describe("POST /comics/backfill-covers", () => {
@@ -696,7 +750,7 @@ describe("/comics", () => {
       });
       const body = (await res.json()) as { results: Array<{ cover_url: string | null; reason?: string }> };
       expect(body.results[0].cover_url).toBeNull();
-      expect(body.results[0].reason).toBe("tidak ditemukan di MangaDex");
+      expect(body.results[0].reason).toBe("tidak ditemukan di MangaDex maupun AniList");
 
       vi.unstubAllGlobals();
     });

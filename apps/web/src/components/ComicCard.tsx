@@ -167,6 +167,11 @@ export function ComicCard({
         >
           {comic.title}
         </h3>
+        {comic.note && (
+          <p className="truncate text-[11px] italic text-amber-300/80" title={comic.note}>
+            {comic.note}
+          </p>
+        )}
         <div className="mt-auto flex items-center justify-between text-xs text-slate-400">
           <span className="font-mono text-indigo-300">
             Ch {formatChapter(comic.latest_chapter)}

@@ -9,9 +9,12 @@ import {
 
 // Cloudflare Workers cap subrequests per invocation, so entries/covers/detections
 // are sent in small chunks rather than one giant request — see CLAUDE.md.
+// COVER/DETECT turun mengikuti batas Worker baru (MAX_COVER_BACKFILL/
+// MAX_DETECT_TITLES di routes/comics.ts) — tiap judul kini bisa memanggil
+// MangaDex DAN AniList.
 const IMPORT_CHUNK_SIZE = 20;
-const COVER_CHUNK_SIZE = 15;
-const DETECT_CHUNK_SIZE = 10;
+const COVER_CHUNK_SIZE = 6;
+const DETECT_CHUNK_SIZE = 8;
 
 type Phase = "editing" | "preview" | "importing" | "done";
 
@@ -70,7 +73,7 @@ export function BulkImportPanel() {
           if (e.type_tag !== null) return e;
           const type = detected.get(e.title);
           if (type) return { ...e, type_tag: type as ParsedEntry["type_tag"] };
-          failures.push({ title: e.title, reason: "jenis tidak terdeteksi di MangaDex — tulis (jenis) manual" });
+          failures.push({ title: e.title, reason: "jenis tidak terdeteksi di MangaDex/AniList — tulis (jenis) manual" });
           return e;
         }),
       );
@@ -164,9 +167,17 @@ export function BulkImportPanel() {
             yang diterima: titik, koma, atau tanda hubung (mis. <code>ch38-1</code> = 38.1).
           </li>
           <li>
-            Kalau <code>(jenis)</code> tidak ditulis, jenis bisa dideteksi otomatis dari MangaDex —
-            hanya untuk komik berbahasa asal Jepang/Korea/China yang terdaftar di sana. Judul yang
-            tidak cocok cukup meyakinkan tidak akan ditebak.
+            Kalau <code>(jenis)</code> tidak ditulis, jenis bisa dideteksi otomatis dari MangaDex
+            (fallback AniList) — hanya untuk komik berbahasa asal Jepang/Korea/China yang terdaftar
+            di sana. Judul yang tidak cocok cukup meyakinkan tidak akan ditebak.
+          </li>
+          <li>
+            Beberapa variasi dinormalisasi otomatis: pemisah <code>;</code>, chapter{" "}
+            <code>c13</code>/<code>ch,60</code>, status <code>(end)</code> → completed, tag{" "}
+            <code>mangashort</code>/<code>hmanga</code>/<code>manga{"{colored}"}</code> → manga
+            (h = 18+; short/colored jadi catatan). Status bebas seperti <code>(hiatus)</code> atau{" "}
+            <code>(S1 end)</code> TIDAK ditebak — status jadi ongoing dan teks aslinya disimpan
+            sebagai catatan komik.
           </li>
           <li>
             <strong>Status 18+ tidak pernah dideteksi otomatis</strong> — harus ditulis eksplisit

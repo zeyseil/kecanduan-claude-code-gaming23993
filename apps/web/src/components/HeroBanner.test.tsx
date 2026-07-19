@@ -17,6 +17,7 @@ function comic(overrides: Partial<Comic> = {}): Comic {
     cover_url: null,
     read_url: null,
     release_day: null,
+    note: null,
     created_at: "2025-01-01T00:00:00.000Z",
     updated_at: "2026-07-18T00:00:00.000Z",
     ...overrides,

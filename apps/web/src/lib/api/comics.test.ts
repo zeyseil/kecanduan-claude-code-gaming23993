@@ -13,6 +13,7 @@ const SAMPLE: Comic = {
   cover_url: null,
   read_url: null,
   release_day: null,
+  note: null,
   created_at: "2026-01-01T00:00:00.000Z",
   updated_at: "2026-01-01T00:00:00.000Z",
 };
@@ -101,6 +102,7 @@ describe("postComic", () => {
       cover_url: null,
       read_url: null,
       release_day: null,
+      note: null,
     });
 
     expect(result).toEqual(SAMPLE);
@@ -132,6 +134,7 @@ describe("postComic", () => {
         cover_url: null,
         read_url: null,
         release_day: null,
+        note: null,
       }),
     ).rejects.toThrow("title wajib diisi");
   });

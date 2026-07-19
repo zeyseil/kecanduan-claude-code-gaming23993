@@ -22,6 +22,8 @@ export interface NewComicInput {
   read_url: string | null;
   /** Hari rilis mingguan (0=Minggu … 6=Sabtu). null kalau tidak diketahui. */
   release_day: number | null;
+  /** Catatan bebas user. null kalau kosong. */
+  note: string | null;
 }
 
 export async function errorMessage(res: Response): Promise<string> {
@@ -52,6 +54,7 @@ export type ComicPatch = Partial<
     | "cover_url"
     | "read_url"
     | "release_day"
+    | "note"
   >
 >;
 

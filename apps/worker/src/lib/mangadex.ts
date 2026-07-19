@@ -12,12 +12,7 @@
 // and the string a user would actually type lives in altTitles.
 
 import type { TypeTag } from "../types/comic";
-import { titleSimilarity } from "../store/fuzzyMatch";
-
-/** Minimum similarity before a MangaDex result is accepted as "the same comic".
- * Matches BULK_MATCH_THRESHOLD in routes/comics.ts — same question, same bar.
- * Below this we return nothing rather than guess. */
-const MATCH_THRESHOLD = 0.85;
+import { pickBestTitleMatch, STRICT_THRESHOLD, RELAXED_THRESHOLD } from "./titleMatch";
 
 /** Original language -> comic type. Anything else (e.g. "en" on fan works)
  * deliberately maps to null: an unknown language is not a reason to assume manga. */
@@ -70,33 +65,16 @@ function allTitleStrings(entry: MangaDexMangaEntry): string[] {
 
 /**
  * Picks the entry whose best title (primary or alternate) is closest to
- * `queryTitle`, or null when nothing clears MATCH_THRESHOLD.
- *
- * Scoring reuses titleSimilarity() from store/fuzzyMatch.ts — the same
- * deterministic token-sort ratio already used to match comics against the
- * user's own library, so "is this the same title?" is answered one way
- * everywhere in the codebase.
+ * `queryTitle`, or null when nothing passes the shared acceptance rule in
+ * lib/titleMatch.ts (strict 0.85, or relaxed 0.7 + substring — see that file).
+ * The same rule verifies AniList results, so "is this the same title?" is
+ * answered one way everywhere in the codebase.
  */
 export function pickBestMatch(
   entries: MangaDexMangaEntry[],
   queryTitle: string,
 ): MangaDexMangaEntry | null {
-  let best: { entry: MangaDexMangaEntry; score: number } | null = null;
-
-  for (const entry of entries) {
-    const titles = allTitleStrings(entry);
-    if (titles.length === 0) continue;
-
-    const score = Math.max(...titles.map((t) => titleSimilarity(t, queryTitle)));
-    if (!best || score > best.score) {
-      best = { entry, score };
-    }
-  }
-
-  if (!best || best.score < MATCH_THRESHOLD) {
-    return null;
-  }
-  return best.entry;
+  return pickBestTitleMatch(entries, queryTitle, allTitleStrings);
 }
 
 function coverUrlFor(entry: MangaDexMangaEntry): string | null {
@@ -140,7 +118,7 @@ export async function fetchMangaDexInfo(title: string): Promise<MangaDexInfo | n
   const match = pickBestMatch(entries, title);
   if (!match) {
     console.error(
-      `fetchMangaDexInfo: ${entries.length} kandidat ditemukan untuk "${title}", tapi tidak ada yang lolos ambang kemiripan ${MATCH_THRESHOLD}`,
+      `fetchMangaDexInfo: ${entries.length} kandidat ditemukan untuk "${title}", tapi tidak ada yang lolos ambang kemiripan (${STRICT_THRESHOLD} / ${RELAXED_THRESHOLD}+substring)`,
     );
     return null;
   }
