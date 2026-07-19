@@ -48,5 +48,18 @@ export function createAstraComicRepository(env: Env): ComicRepository {
       const docs = await collection.find({ user_id: userId }).toArray();
       return rankCandidates(docs.map(toComic), candidateTitle);
     },
+
+    async countComicsPerUser() {
+      // Projection pulls ONLY user_id — titles/covers never leave Astra, so an
+      // admin aggregating counts can't see any other user's content.
+      const docs = await collection
+        .find({}, { projection: { user_id: 1 } })
+        .toArray();
+      const counts = new Map<string, number>();
+      for (const doc of docs as Array<{ user_id: string }>) {
+        counts.set(doc.user_id, (counts.get(doc.user_id) ?? 0) + 1);
+      }
+      return [...counts.entries()].map(([user_id, count]) => ({ user_id, count }));
+    },
   };
 }

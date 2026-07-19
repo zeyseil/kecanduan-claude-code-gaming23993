@@ -47,6 +47,12 @@ export const inMemoryComicRepository: ComicRepository = {
   async searchComics(userId, candidateTitle) {
     return rankCandidates(bucket(userId), candidateTitle);
   },
+
+  async countComicsPerUser() {
+    return [...comicsByUser.entries()]
+      .map(([user_id, list]) => ({ user_id, count: list.length }))
+      .filter((entry) => entry.count > 0);
+  },
 };
 
 /** Test-only: reset all state between test cases. */

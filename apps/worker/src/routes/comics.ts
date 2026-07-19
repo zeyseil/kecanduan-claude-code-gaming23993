@@ -6,6 +6,7 @@ import { getComicStore } from "../store/comicStore";
 import { rankCandidates } from "../store/fuzzyMatch";
 import { userAuth } from "../middleware/userAuth";
 import { rateLimit } from "../middleware/rateLimit";
+import type { Role } from "../lib/authValue";
 import { acquireMangaDexSlot } from "../durable-objects/RateLimiter";
 import { fetchMangaDexCover, fetchMangaDexInfo } from "../lib/mangadex";
 
@@ -60,7 +61,7 @@ function validateCreateBody(body: CreateComicBody): string | null {
   return null;
 }
 
-export const comics = new Hono<{ Bindings: Env; Variables: { userId: string } }>();
+export const comics = new Hono<{ Bindings: Env; Variables: { userId: string; role: Role } }>();
 
 comics.use("*", userAuth, rateLimit);
 

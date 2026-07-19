@@ -12,4 +12,7 @@ export interface ComicRepository {
   ): Promise<Comic | undefined>;
   deleteComic(userId: string, comicId: string): Promise<boolean>;
   searchComics(userId: string, candidateTitle: string): Promise<SimilarityCandidate[]>;
+  /** Admin-only: comic count per user across ALL partitions. Pulls only
+   * `user_id` (never titles/covers) so no other user's content leaks. */
+  countComicsPerUser(): Promise<Array<{ user_id: string; count: number }>>;
 }

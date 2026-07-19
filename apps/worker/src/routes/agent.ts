@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Env } from "../env";
 import { userAuth } from "../middleware/userAuth";
 import { rateLimit } from "../middleware/rateLimit";
+import type { Role } from "../lib/authValue";
 import { runAgent, AgentLoopError } from "../agent/runAgent";
 import { GeminiError, listModels } from "../agent/geminiClient";
 import { buildModelOptions, type ListedModel } from "../agent/models";
@@ -16,7 +17,7 @@ interface AgentModelsBody {
   google_api_key?: unknown;
 }
 
-export const agent = new Hono<{ Bindings: Env; Variables: { userId: string } }>();
+export const agent = new Hono<{ Bindings: Env; Variables: { userId: string; role: Role } }>();
 
 agent.use("/process", userAuth, rateLimit);
 agent.use("/models", userAuth, rateLimit);
