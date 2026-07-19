@@ -295,6 +295,23 @@ Slice kedua puluh (branch `feat/cover-dropzone-and-login`, base `main`): dua per
 - **Diverifikasi di browser nyata** (dev server user, non-destruktif — tidak ada komik dibuat/diubah, jumlah komik tetap 1 setelah semua uji coba): login split-screen di 1440px (panel kiri blur + branding, panel kanan form), 800px & 375px (panel kiri hilang, form penuh, tanpa scroll horizontal), tidak ada error console. Dropzone: `dragover` → border indigo + teks "Lepaskan di sini"; **drop file gambar sungguhan** (PNG dibuat lewat canvas + `DataTransfer`) → spinner tampil → `ImageCropModal` terbuka berisi gambar itu; drop `.pdf` → pesan penolakan, tidak ada spinner, crop modal tidak terbuka.
 - Catatan proses: sempat salah menyimpulkan "modal tidak terbuka" karena `b.click()` lalu langsung query DOM di `javascript_tool` — itu balapan dengan commit React, bukan bug. Setelah diberi jeda ~400ms, modal terbukti terbuka normal.
 
+Slice kedua puluh satu, Tahap 1 (branch `feat/cover-dropzone-and-login`, lanjutan): ikon aplikasi resmi, menggantikan placeholder "KT" dan nol-favicon sebelumnya. User menyediakan sumber `logo.png` 2000×2000 di root repo (dipindah ke `apps/web/public/icon.png`, file sumber di root dihapus setelah disalin).
+- Turunan dibuat sekali (di-commit, bukan build step) via `npx sharp-cli@2` + `npx png-to-ico` sekali-jalan: `apps/web/public/icon-192.png`, `icon-512.png`, `apple-touch-icon.png` (180×180), `favicon.ico` (multi-size 16/32/48 asli, bukan PNG-disamarkan — dikonfirmasi lewat `png-to-ico`, bukan cuma rename).
+- `apps/web/public/manifest.webmanifest` (baru): `background_color`/`theme_color` `#1e293b` (slate-800, senada latar ikon), `display: "standalone"` — siap untuk PWA maupun jadi basis ikon Tauri/Capacitor nanti (belum ada config Tauri/Capacitor di repo saat ini, jadi belum ada yang disambungkan langsung).
+- `apps/web/index.html`: tambah `<link rel="icon">` (favicon.ico + PNG 192), `apple-touch-icon`, `manifest`, `<meta name="theme-color">` — sebelumnya file ini cuma berisi `<title>`.
+- `apps/web/src/components/AppLogo.tsx` (baru): `<img src="/icon-192.png" alt="">` — `alt` sengaja kosong karena selalu didampingi wordmark teks "Komik Tracker" di pemanggilnya (mencegah screen reader baca dua kali, dan menjaga test `Login.test.tsx` yang mencari heading "Komik Tracker" tetap hijau tanpa diubah).
+- Dipasang di 3 tempat: `App.tsx` (header Shell, sebelah wordmark), `routes/Login.tsx` (panel branding kiri, **menggantikan** kotak placeholder "KT" `bg-indigo-600`) dan header panel kanan Login (tambahan kecil di luar rencana awal, untuk konsistensi — sebelumnya cuma teks).
+- Total test: `pnpm --filter web test` → tetap **127 hijau** (murni penambahan aset + swap komponen, tidak ada logika berubah). Lint+build bersih.
+- **Diverifikasi di browser nyata** (dev server, 1440×900): favicon tab muncul, logo tampil benar di header Shell, panel kiri Login (64×64), dan header panel kanan Login (24×24). Tidak ada error konsol.
+- Tahap 2 (redesain layout Daftar Komik: dua kolom, hero banner, sidebar statistik/aktivitas/jadwal rilis, glow background, field baru `read_url`+`release_day`) — **direncanakan, belum dikerjakan sesi ini**, akan menyusul sebagai PR terpisah `feat/dashboard-layout` sesuai rencana yang disetujui user.
+
+## Verifikasi Manual — Ikon Aplikasi (Slice kedua puluh satu, Tahap 1)
+1. `pnpm --filter web test` → 127 hijau. Lint+build bersih.
+2. Buka aplikasi di browser → cek favicon muncul di tab.
+3. Buka `/login` → panel kiri (layar ≥1024px) menampilkan logo 64×64 di sebelah wordmark; header panel kanan menampilkan logo kecil.
+4. Login → header Shell menampilkan logo di sebelah wordmark "Komik Tracker".
+5. Install sebagai PWA (opsional, Chrome desktop: menu → "Install Komik Tracker…") → cek ikon yang dipakai sesuai `manifest.webmanifest`.
+
 ## Verifikasi Manual — Cover Dropzone + Login (Slice kedua puluh)
 1. `pnpm --filter web test` → 127 hijau. Lint+build bersih.
 2. `pnpm --filter web dev` + `pnpm --filter worker dev`, buka `/login` **tanpa token** (hapus `komik-tracker:auth-token` di localStorage) → split-screen tampil, header/nav aplikasi TIDAK ada. Kecilkan jendela di bawah ~1024px → panel kiri hilang, form tetap rapi.
