@@ -25,9 +25,16 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+function mockFetch(response: Response) {
+  return vi.fn(async (...args: [string, RequestInit?]) => {
+    void args;
+    return response;
+  });
+}
+
 describe("admin api", () => {
   it("attaches Authorization header on fetchAdminUsers", async () => {
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
+    const fetchMock = mockFetch(
       new Response(JSON.stringify({ users: [], list_complete: true }), { status: 200 }),
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -38,7 +45,7 @@ describe("admin api", () => {
   });
 
   it("createToken posts user_id and returns the token", async () => {
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
+    const fetchMock = mockFetch(
       new Response(JSON.stringify({ token: "abc123", user_id: "budi", role: "user" }), { status: 201 }),
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -51,7 +58,7 @@ describe("admin api", () => {
   });
 
   it("revokeUserAccess DELETEs by user_id", async () => {
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
+    const fetchMock = mockFetch(
       new Response(JSON.stringify({ revoked: 1, skipped_admin: 0 }), { status: 200 }),
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -64,7 +71,7 @@ describe("admin api", () => {
   });
 
   it("throws on a non-ok response", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "boom" }), { status: 500 })));
+    vi.stubGlobal("fetch", mockFetch(new Response(JSON.stringify({ error: "boom" }), { status: 500 })));
     await expect(fetchAdminUsers()).rejects.toThrow();
   });
 });
