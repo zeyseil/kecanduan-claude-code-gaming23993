@@ -45,7 +45,22 @@ wrangler secret put ASTRA_DB_API_ENDPOINT
 wrangler secret put ASTRA_DB_APPLICATION_TOKEN
 wrangler secret put ASTRA_DB_COLLECTION
 wrangler secret put PROCESS_LOG_COLLECTION
+wrangler secret put ALLOWED_ORIGINS   # mis. https://komik-tracker.pages.dev,http://localhost:5173
 ```
+
+`ALLOWED_ORIGINS` (comma-separated) mempersempit CORS ke origin browser yang
+sah — biasanya URL Cloudflare Pages web app + `http://localhost:5173` untuk dev.
+Kalau kosong, Worker fallback ke `http://localhost:5173` saja (lihat
+`src/index.ts`). Auth memakai `Authorization: Bearer` (bukan cookie), jadi ini
+mengurangi permukaan, bukan menutup lubang CSRF.
+
+Setelah `wrangler deploy`, provisioning token milikmu ke KV **production**
+(field `id`, bukan hanya `--preview`) supaya Worker ter-deploy mengenalinya:
+`wrangler kv key put --binding=AUTH_TOKENS "<token>" "<user-id>" --remote`.
+Web app di-host di Cloudflare Pages (`wrangler pages deploy apps/web/dist
+--project-name komik-tracker`); build web dengan `VITE_WORKER_URL` menunjuk URL
+Worker produksi (di-bake saat build, karena deploy Pages ini direct-upload
+`dist`, bukan git-connected). SPA fallback disediakan `apps/web/public/_redirects`.
 
 Tidak ada secret untuk AI: orkestrasi agent jalan di dalam Worker
 (`src/agent/`) dan memanggil Gemini dengan **API key milik user**, dikirim

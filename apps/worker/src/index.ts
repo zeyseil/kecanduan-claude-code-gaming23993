@@ -7,9 +7,19 @@ import { scheduled } from "./scheduled";
 
 export const app = new Hono<{ Bindings: Env }>();
 
-// Origin wildcard untuk dev — belum ada auth/data sensitif nyata.
-// TODO: persempit ke origin spesifik sebelum deploy production.
-app.use("*", cors());
+const DEV_ORIGIN = "http://localhost:5173";
+
+/** Origin diambil dari env supaya deploy production bisa dipersempit tanpa
+ * ubah kode. Kosong = dev lokal saja. Dibangun per-request karena `env` baru
+ * tersedia di dalam handler, bukan saat modul dimuat. */
+app.use("*", (c, next) => {
+  const allowed = (c.env.ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const origins = allowed.length > 0 ? allowed : [DEV_ORIGIN];
+  return cors({ origin: origins })(c, next);
+});
 
 app.get("/", (c) => c.json({ name: "komik-tracker-worker", status: "ok" }));
 app.route("/comics", comics);
