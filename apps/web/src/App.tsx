@@ -6,6 +6,7 @@ import { Login } from "./routes/Login";
 import { Admin } from "./routes/Admin";
 import { RequireAuth } from "./components/RequireAuth";
 import { RequireAdmin } from "./components/RequireAdmin";
+import { AppLogo } from "./components/AppLogo";
 import { getAuthToken } from "./lib/storage";
 import { fetchAdminHealth } from "./lib/api/admin";
 
@@ -48,6 +49,7 @@ function Shell({ isAdmin }: { isAdmin: boolean }) {
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <header className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+          <AppLogo className="h-7 w-7" />
           <span className="text-base font-bold text-indigo-400">
             Komik Tracker
           </span>

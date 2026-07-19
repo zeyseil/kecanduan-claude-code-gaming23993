@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { setAuthToken } from "../lib/storage";
+import { AppLogo } from "../components/AppLogo";
 
 /**
  * Latar panel kiri: tiruan grid Daftar Komik yang diburamkan.
@@ -54,9 +55,7 @@ export function Login() {
 
         <div className="relative flex h-full flex-col items-center justify-center gap-4 px-12 text-center">
           <div className="flex items-center gap-4">
-            <span className="flex h-16 w-16 items-center justify-center rounded-xl bg-indigo-600 text-2xl font-bold text-white shadow-lg">
-              KT
-            </span>
+            <AppLogo className="h-16 w-16 shadow-lg" />
             <h1 className="text-5xl font-bold tracking-tight text-white">
               Komik Tracker
             </h1>
@@ -69,7 +68,8 @@ export function Login() {
 
       {/* Panel kanan — form login. */}
       <div className="flex flex-col">
-        <header className="border-b border-slate-800 px-6 py-4">
+        <header className="flex items-center gap-2 border-b border-slate-800 px-6 py-4">
+          <AppLogo className="h-6 w-6" />
           <span className="text-base font-bold text-indigo-400">Komik Tracker</span>
         </header>
 
