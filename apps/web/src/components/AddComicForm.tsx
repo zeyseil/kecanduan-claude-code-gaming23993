@@ -3,6 +3,7 @@ import type { TypeTag } from "../types/comic";
 import { TYPE_TAGS } from "../types/comic";
 import type { NewComicInput } from "../lib/api/comics";
 import { readFileAsDataUrl } from "../lib/cropImage";
+import { CoverDropzone } from "./CoverDropzone";
 import { ImageCropModal } from "./ImageCropModal";
 
 const TYPE_LABEL: Record<TypeTag, string> = {
@@ -25,13 +26,17 @@ export function AddComicForm({ onSubmit, onCancel }: AddComicFormProps) {
   const [pendingCropSrc, setPendingCropSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [coverBusy, setCoverBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const dataUrl = await readFileAsDataUrl(file);
-    setPendingCropSrc(dataUrl);
+  const handleFileSelected = async (file: File) => {
+    setCoverBusy(true);
+    try {
+      setPendingCropSrc(await readFileAsDataUrl(file));
+    } catch {
+      setError("Gagal membaca file gambar.");
+      setCoverBusy(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -121,25 +126,13 @@ export function AddComicForm({ onSubmit, onCancel }: AddComicFormProps) {
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-slate-300">
-          Cover Image
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="text-sm text-slate-400"
-          />
-        </label>
-
-        {coverUrl && (
-          <img
-            src={coverUrl}
-            alt="Preview cover"
-            referrerPolicy="no-referrer"
-            className="h-32 w-24 rounded-md object-cover"
-          />
-        )}
+        <CoverDropzone
+          ref={fileInputRef}
+          value={coverUrl}
+          onFileSelected={handleFileSelected}
+          busy={coverBusy}
+          disabled={submitting}
+        />
 
         <div className="flex justify-end gap-2 pt-2">
           <button
@@ -165,11 +158,14 @@ export function AddComicForm({ onSubmit, onCancel }: AddComicFormProps) {
           imageSrc={pendingCropSrc}
           onCancel={() => {
             setPendingCropSrc(null);
+            setCoverBusy(false);
+            // Reset supaya file yang sama bisa dipilih ulang.
             if (fileInputRef.current) fileInputRef.current.value = "";
           }}
           onCropped={(dataUrl) => {
             setCoverUrl(dataUrl);
             setPendingCropSrc(null);
+            setCoverBusy(false);
           }}
         />
       )}

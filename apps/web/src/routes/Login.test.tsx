@@ -58,4 +58,20 @@ describe("Login", () => {
 
     expect(getAuthToken()).toBeNull();
   });
+
+  it("menampilkan panel branding split-screen", () => {
+    render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Komik Tracker" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Temukan dan Lacak Komik Favorit Anda."),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/minta admin/i)).toBeInTheDocument();
+  });
 });

@@ -278,6 +278,32 @@ Slice kesembilan belas (branch `feat/admin-dashboard`, base `main`): dashboard a
 - **Verifikasi otomatis lewat suite** (bukan browser — halaman `/admin` butuh KV admin-token cloud milik user, jadi end-to-end diserahkan sebagai langkah manual): backward-compat legacy token, gating, masking, admin-protection, dan partisi privasi log semua ditegakkan test.
 - `apps/worker/README.md` bagian "Setup Auth" diperbarui: dua bentuk value KV + backward-compat + perintah menjadikan token admin (kedua namespace).
 
+Slice kedua puluh (branch `feat/cover-dropzone-and-login`, base `main`): dua perbaikan UI murni frontend — drop zone cover dan halaman login split-screen. **Tidak ada perubahan apa pun di `apps/worker`.** Deploy Cloudflare (slice kedelapan belas) dan verifikasi manual dashboard admin (slice kesembilan belas) sudah dituntaskan user sendiri sebelum sesi ini.
+
+**Tahap 1 — `CoverDropzone` bersama:**
+- Masalah asal: `AddComicForm.tsx` dan `EditComicForm.tsx` memakai `<input type="file">` native tanpa styling ("Choose a file" adalah teks bawaan browser), markup + handler-nya **duplikat byte-identik**, tidak ada indikator loading selama `readFileAsDataUrl` → crop → `getCroppedImageDataUrl`, dan `readFileAsDataUrl` yang gagal jadi unhandled promise rejection.
+- `apps/web/src/components/CoverDropzone.tsx` (baru, `forwardRef<HTMLInputElement>` supaya `fileInputRef.current.value = ""` di kedua form tetap jalan): input file sungguhan disembunyikan `sr-only` (BUKAN `display:none`) di dalam `<label>` — klik, fokus keyboard, dan screen reader jalan tanpa handler tambahan. Teks "Drop a file" / "Lepaskan di sini" saat drag, sub-teks "atau klik untuk memilih · JPG/PNG", ikon panah yang bergeser saat drag.
+- Drop memfilter non-gambar lewat `file.type.startsWith("image/")` → pesan inline "File itu bukan gambar", `onFileSelected` tidak dipanggil sama sekali. Label `id` dibuat lewat `useId()` (bukan string tetap) supaya tidak bentrok kalau dua instance pernah dirender bersamaan.
+- **Tidak ada perubahan `tailwind.config.js`** — rencana awal mau menambah keyframes spinner, ternyata `animate-spin`/`animate-pulse` sudah stock Tailwind. Token `glow`/`glow-danger` tidak disentuh.
+- Kedua form: state `coverBusy` baru (di-set sebelum baca file, tetap `true` selama `ImageCropModal` terbuka, direset di `onCropped`/`onCancel`), plus **`try/catch` di sekitar `readFileAsDataUrl`** → `setError("Gagal membaca file gambar.")` lewat mekanisme error form yang sudah ada. `ImageCropModal.tsx` dan `lib/cropImage.ts` TIDAK diubah.
+
+**Tahap 2 — Login split-screen:**
+- `apps/web/src/App.tsx`: `<Routes>` dipecah dua cabang — `/login` berdiri sendiri, `path="*"` merender komponen baru `Shell` (header sticky + nav + `<main>` yang sebelumnya membungkus semua route). Konsekuensi: header/nav aplikasi **tidak lagi tampil di halaman login** (sebelumnya tampil walau user belum login). `RequireAuth`/`RequireAdmin` dan semua route lain tidak berubah.
+- `apps/web/src/routes/Login.tsx` (rewrite): `grid min-h-screen lg:grid-cols-2`. Panel kiri `hidden lg:block` (mobile-first — di HP hanya form yang tampil): `DashboardPreview` (komponen lokal, **murni div/CSS**: 12 kartu 3:4 gradien slate/indigo + garis skeleton) di-`blur-[6px] scale-110`, overlay gradien slate/indigo untuk kontras, lalu logo placeholder "KT" + judul + tagline di atasnya. Sengaja tanpa `ComicCard` asli, tanpa data, tanpa aset eksternal — halaman ini belum terautentikasi.
+- Panel kanan: nav wordmark, judul "Login", deskripsi token-tidak-divalidasi, label `TOKEN`, input password `autoFocus`, tombol "Masuk" indigo, teks bantuan "aplikasi belum dipublikkan jadi mau login harus minta admin", footer "© 2026 Komik Tracker.". **Logika submit tidak berubah** (trim kosong → no-op, selain itu `setAuthToken` + `navigate("/", {replace:true})`); `htmlFor="auth-token"` dipertahankan supaya 2 test lama tetap hijau tanpa diubah.
+- Total test: `pnpm --filter web test` → **127 hijau** (+5 `CoverDropzone.test.tsx`: klik-upload, drop, tolak non-gambar, indikator busy, preview; +1 test panel branding di `Login.test.tsx`). `pnpm --filter worker test` tetap **129**. Lint+build web bersih.
+- **Diverifikasi di browser nyata** (dev server user, non-destruktif — tidak ada komik dibuat/diubah, jumlah komik tetap 1 setelah semua uji coba): login split-screen di 1440px (panel kiri blur + branding, panel kanan form), 800px & 375px (panel kiri hilang, form penuh, tanpa scroll horizontal), tidak ada error console. Dropzone: `dragover` → border indigo + teks "Lepaskan di sini"; **drop file gambar sungguhan** (PNG dibuat lewat canvas + `DataTransfer`) → spinner tampil → `ImageCropModal` terbuka berisi gambar itu; drop `.pdf` → pesan penolakan, tidak ada spinner, crop modal tidak terbuka.
+- Catatan proses: sempat salah menyimpulkan "modal tidak terbuka" karena `b.click()` lalu langsung query DOM di `javascript_tool` — itu balapan dengan commit React, bukan bug. Setelah diberi jeda ~400ms, modal terbukti terbuka normal.
+
+## Verifikasi Manual — Cover Dropzone + Login (Slice kedua puluh)
+1. `pnpm --filter web test` → 127 hijau. Lint+build bersih.
+2. `pnpm --filter web dev` + `pnpm --filter worker dev`, buka `/login` **tanpa token** (hapus `komik-tracker:auth-token` di localStorage) → split-screen tampil, header/nav aplikasi TIDAK ada. Kecilkan jendela di bawah ~1024px → panel kiri hilang, form tetap rapi.
+3. Login dengan token Anda → masuk ke Daftar Komik seperti biasa (header/nav kembali muncul).
+4. Tambah Komik → **drag file gambar dari File Explorer** ke zona (ini yang tidak bisa saya uji otomatis — drag dari OS sungguhan) → spinner "Memproses gambar…" → modal crop terbuka → Gunakan Cover → Tambah Komik → cover tampil di grid dan tersimpan di Astra.
+5. Ulangi lewat **klik** zona (file picker biasa) untuk memastikan jalur lama tidak rusak.
+6. Edit komik existing → ganti cover lewat drop → Simpan → cek Astra cover berubah.
+7. Drop file non-gambar (mis. `.pdf`) → pesan "File itu bukan gambar", tidak ada spinner, tidak crash.
+
 ## Verifikasi Manual — Dashboard Admin (Slice kesembilan belas)
 1. `pnpm --filter worker test` → 129 hijau, `pnpm --filter web test` → 120 hijau. Lint+build bersih.
 2. Jadikan token Anda admin (kedua namespace): `wrangler kv key put --binding=AUTH_TOKENS "<token-anda>" '{"user_id":"<user-id>","role":"admin"}' --remote --preview false` lalu ulangi dengan `--preview`.
