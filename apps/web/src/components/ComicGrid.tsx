@@ -6,9 +6,21 @@ interface ComicGridProps {
   pressedComicId: string | null;
   onPress: (comicId: string) => void;
   onEdit: (comic: Comic) => void;
+  /** Mode bulk-delete: klik card = pilih, bukan press-to-reveal. */
+  selectMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (comicId: string) => void;
 }
 
-export function ComicGrid({ comics, pressedComicId, onPress, onEdit }: ComicGridProps) {
+export function ComicGrid({
+  comics,
+  pressedComicId,
+  onPress,
+  onEdit,
+  selectMode = false,
+  selectedIds,
+  onToggleSelect,
+}: ComicGridProps) {
   if (comics.length === 0) {
     return (
       <p className="py-12 text-center text-slate-400">
@@ -19,7 +31,9 @@ export function ComicGrid({ comics, pressedComicId, onPress, onEdit }: ComicGrid
 
   return (
     <div className="relative">
-      {pressedComicId !== null && (
+      {/* Backdrop click-catcher hanya untuk press-to-reveal; dimatikan di mode
+          pilih supaya klik pertama tidak dimakan backdrop. */}
+      {!selectMode && pressedComicId !== null && (
         <div
           aria-hidden="true"
           onClick={() => onPress(pressedComicId)}
@@ -31,10 +45,13 @@ export function ComicGrid({ comics, pressedComicId, onPress, onEdit }: ComicGrid
           <ComicCard
             key={comic.comic_id}
             comic={comic}
-            isPressed={comic.comic_id === pressedComicId}
-            isDimmed={pressedComicId !== null && comic.comic_id !== pressedComicId}
+            isPressed={!selectMode && comic.comic_id === pressedComicId}
+            isDimmed={!selectMode && pressedComicId !== null && comic.comic_id !== pressedComicId}
             onPress={onPress}
             onEdit={onEdit}
+            isSelectable={selectMode}
+            isSelected={selectMode && (selectedIds?.has(comic.comic_id) ?? false)}
+            onToggleSelect={onToggleSelect}
           />
         ))}
       </div>

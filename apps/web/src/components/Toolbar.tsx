@@ -23,9 +23,22 @@ interface ToolbarProps {
   options: ComicListOptions;
   onChange: (next: ComicListOptions) => void;
   onOpenSearch: () => void;
+  onExport: () => void;
+  /** false kalau tidak ada komik untuk diekspor. */
+  canExport: boolean;
+  onToggleSelect: () => void;
+  selectMode: boolean;
 }
 
-export function Toolbar({ options, onChange, onOpenSearch }: ToolbarProps) {
+export function Toolbar({
+  options,
+  onChange,
+  onOpenSearch,
+  onExport,
+  canExport,
+  onToggleSelect,
+  selectMode,
+}: ToolbarProps) {
   const set = <K extends keyof ComicListOptions>(
     key: K,
     value: ComicListOptions[K],
@@ -88,6 +101,29 @@ export function Toolbar({ options, onChange, onOpenSearch }: ToolbarProps) {
           </option>
         ))}
       </select>
+
+      <div className="flex gap-2 sm:ml-auto">
+        <button
+          type="button"
+          onClick={onToggleSelect}
+          className={`rounded-md border px-3 py-2 text-sm transition ${
+            selectMode
+              ? "border-rose-500 bg-rose-950/40 text-rose-200"
+              : "border-slate-600 bg-slate-800 text-slate-300 hover:border-rose-500 hover:text-rose-200"
+          }`}
+        >
+          {selectMode ? "Batal pilih" : "Pilih"}
+        </button>
+        <button
+          type="button"
+          onClick={onExport}
+          disabled={!canExport}
+          title={canExport ? "Unduh daftar komik sebagai file .md" : "Belum ada komik untuk diekspor"}
+          className="rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-300 hover:border-indigo-500 hover:text-slate-200 disabled:opacity-50 disabled:hover:border-slate-600 disabled:hover:text-slate-300"
+        >
+          Export .md
+        </button>
+      </div>
     </div>
   );
 }

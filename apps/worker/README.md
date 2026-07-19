@@ -53,6 +53,20 @@ per-request dari client dan tidak pernah disimpan di server.
 
 Opsional: `GEMINI_MODEL` bisa di-set (`wrangler secret put GEMINI_MODEL`, atau
 sebagai plain var) untuk menimpa model default di `src/agent/geminiClient.ts`.
+Ini hanya fallback global — user juga bisa memilih model sendiri per-request
+lewat dropdown di halaman Tulis (dikirim di body `/agent/process`, prioritas di
+atas `GEMINI_MODEL`). Daftar model diambil dari `POST /agent/models` yang
+memanggil ListModels pakai API key user + digabung daftar kurasi di
+`src/agent/models.ts`.
+
+### Keep-alive Astra (cron)
+
+`wrangler.toml` punya `[triggers] crons = ["0 3 * * *"]` — sekali sehari Worker
+membaca ringan ke Astra (`src/scheduled.ts`) supaya DB free tier tidak
+dihibernasi karena idle. Cron **hanya jalan di Worker yang sudah di-deploy**,
+tidak di `wrangler dev`. Untuk mengetes handler-nya lokal:
+`wrangler dev --test-scheduled`, lalu
+`curl "localhost:8787/__scheduled?cron=0+3+*+*+*"`.
 
 ## Scripts
 

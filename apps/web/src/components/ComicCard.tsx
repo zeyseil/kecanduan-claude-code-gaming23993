@@ -15,17 +15,40 @@ interface ComicCardProps {
   isDimmed?: boolean;
   onPress?: (comicId: string) => void;
   onEdit?: (comic: Comic) => void;
+  /** Mode bulk-delete aktif: klik card = pilih/batal pilih, bukan press-to-reveal. */
+  isSelectable?: boolean;
+  /** true kalau card ini sedang terpilih untuk dihapus (glow merah). */
+  isSelected?: boolean;
+  onToggleSelect?: (comicId: string) => void;
 }
 
-export function ComicCard({ comic, isPressed, isDimmed, onPress, onEdit }: ComicCardProps) {
+export function ComicCard({
+  comic,
+  isPressed,
+  isDimmed,
+  onPress,
+  onEdit,
+  isSelectable,
+  isSelected,
+  onToggleSelect,
+}: ComicCardProps) {
+  const handleClick = () => {
+    if (isSelectable) {
+      onToggleSelect?.(comic.comic_id);
+      return;
+    }
+    onPress?.(comic.comic_id);
+  };
+
   return (
     <article
-      onClick={() => onPress?.(comic.comic_id)}
+      onClick={handleClick}
+      aria-pressed={isSelectable ? isSelected : undefined}
       className={`group relative flex flex-col overflow-hidden rounded-lg bg-slate-800 shadow transition duration-200 ${
-        onPress ? "cursor-pointer" : ""
+        onPress || isSelectable ? "cursor-pointer" : ""
       } ${isPressed ? "z-10 scale-105 shadow-glow animate-glow-pulse" : ""} ${
-        isDimmed ? "pointer-events-none opacity-40 blur-[1px]" : ""
-      }`}
+        isSelected ? "z-10 scale-105 shadow-glow-danger animate-glow-pulse-danger" : ""
+      } ${isDimmed ? "pointer-events-none opacity-40 blur-[1px]" : ""}`}
     >
       <div className="relative aspect-[3/4] bg-slate-700">
         {comic.cover_url ? (
@@ -59,6 +82,26 @@ export function ComicCard({ comic, isPressed, isDimmed, onPress, onEdit }: Comic
         {comic.status === "completed" && (
           <span className="absolute right-1.5 top-1.5 rounded bg-emerald-600/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">
             Tamat
+          </span>
+        )}
+
+        {isSelectable && isSelected && (
+          <span
+            aria-label="Terpilih untuk dihapus"
+            className="absolute bottom-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-rose-600 text-white shadow"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="h-4 w-4"
+            >
+              <path
+                fillRule="evenodd"
+                d="M16.704 5.29a1 1 0 0 1 .006 1.414l-7.5 7.6a1 1 0 0 1-1.42.004l-3.5-3.5a1 1 0 1 1 1.414-1.414l2.79 2.79 6.796-6.888a1 1 0 0 1 1.414-.006Z"
+                clipRule="evenodd"
+              />
+            </svg>
           </span>
         )}
 

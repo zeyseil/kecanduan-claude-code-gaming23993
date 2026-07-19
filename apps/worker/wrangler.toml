@@ -2,6 +2,12 @@ name = "komik-tracker-worker"
 main = "src/index.ts"
 compatibility_date = "2024-11-01"
 
+# Keep-alive: sekali sehari jam 03:00 UTC, baca ringan ke Astra supaya DB free
+# tier tidak dihibernasi karena idle. Handler: src/scheduled.ts. Cron hanya
+# jalan di Worker yang sudah di-deploy, bukan di `wrangler dev`.
+[triggers]
+crons = ["0 3 * * *"]
+
 [[durable_objects.bindings]]
 name = "RATE_LIMITER"
 class_name = "RateLimiter"

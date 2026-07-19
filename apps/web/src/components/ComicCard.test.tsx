@@ -83,4 +83,31 @@ describe("ComicCard", () => {
 
     expect(onEdit).toHaveBeenCalledWith(c);
   });
+
+  it("di mode pilih, klik card memanggil onToggleSelect (bukan onPress)", async () => {
+    const user = userEvent.setup();
+    const onToggleSelect = vi.fn();
+    const onPress = vi.fn();
+    render(
+      <ComicCard
+        comic={comic({ comic_id: "abc" })}
+        isSelectable
+        onToggleSelect={onToggleSelect}
+        onPress={onPress}
+      />,
+    );
+
+    await user.click(screen.getByText("Contoh Komik"));
+
+    expect(onToggleSelect).toHaveBeenCalledWith("abc");
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it("menampilkan tanda terpilih dengan glow merah saat isSelected", () => {
+    const { container } = render(
+      <ComicCard comic={comic()} isSelectable isSelected onToggleSelect={vi.fn()} />,
+    );
+    expect(screen.getByLabelText("Terpilih untuk dihapus")).toBeInTheDocument();
+    expect(container.querySelector(".shadow-glow-danger")).not.toBeNull();
+  });
 });

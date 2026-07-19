@@ -1,8 +1,14 @@
 import { useState } from "react";
 import { TextEditor } from "../components/TextEditor";
 import { BulkImportPanel } from "../components/BulkImportPanel";
+import { ModelPicker } from "../components/ModelPicker";
 import { processAgentText, type AgentResult } from "../lib/api/agent";
-import { getGoogleApiKey, setGoogleApiKey } from "../lib/storage";
+import {
+  getGoogleApiKey,
+  setGoogleApiKey,
+  getGeminiModel,
+  setGeminiModel,
+} from "../lib/storage";
 
 type Status = "idle" | "processing" | "success" | "error";
 type Mode = "ai" | "import";
@@ -10,6 +16,7 @@ type Mode = "ai" | "import";
 export function Tulis() {
   const [mode, setMode] = useState<Mode>("ai");
   const [apiKey, setApiKey] = useState(() => getGoogleApiKey());
+  const [model, setModel] = useState(() => getGeminiModel());
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<AgentResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -17,6 +24,11 @@ export function Tulis() {
   const handleApiKeyChange = (value: string) => {
     setApiKey(value);
     setGoogleApiKey(value);
+  };
+
+  const handleModelChange = (value: string) => {
+    setModel(value);
+    setGeminiModel(value);
   };
 
   const handleProcess = async (text: string) => {
@@ -31,7 +43,11 @@ export function Tulis() {
     setResult(null);
 
     try {
-      const response = await processAgentText({ teks_input: text, google_api_key: apiKey });
+      const response = await processAgentText({
+        teks_input: text,
+        google_api_key: apiKey,
+        model: model === "" ? undefined : model,
+      });
       setResult(response);
       setStatus("success");
     } catch (err) {
@@ -102,6 +118,34 @@ export function Tulis() {
               </a>
               .
             </p>
+          </div>
+
+          <ModelPicker value={model} onChange={handleModelChange} apiKey={apiKey} />
+
+          <div className="mb-4 rounded-md border border-slate-700 bg-slate-900/60 p-3 text-xs text-slate-400">
+            <p className="mb-1 font-medium text-slate-300">Batasan fitur ini:</p>
+            <ul className="list-disc space-y-0.5 pl-4">
+              <li>
+                Kuota gratis Gemini dihitung <strong>per model per hari</strong>. Satu perintah
+                memakai <strong>4–6 request</strong> (tiap langkah tool = 1 request), jadi kira-kira
+                hanya 3–5 perintah/hari per model di tier paling ketat.
+              </li>
+              <li>
+                Ganti model = ember kuota terpisah — <strong>kecuali</strong>{" "}
+                <code>gemini-flash-latest</code> yang menunjuk ke model Flash yang sama, jadi ganti
+                alias itu tidak menambah kuota.
+              </li>
+              <li>
+                Satu perintah = satu komik. Untuk banyak judul sekaligus, pakai{" "}
+                <strong>Import historis</strong> (tanpa AI, tanpa kuota) atau tombol{" "}
+                <strong>Tambah Komik</strong> manual di Daftar Komik.
+              </li>
+              <li>
+                Kalau proses gagal di tengah, komik yang baru dibuat di proses itu dihapus otomatis;
+                update chapter yang sudah masuk tidak dibatalkan.
+              </li>
+              <li>Angka kuota di atas perkiraan — angka pasti ada di dashboard AI Studio akun Anda.</li>
+            </ul>
           </div>
 
           <TextEditor onProcess={handleProcess} disabled={status === "processing"} />
