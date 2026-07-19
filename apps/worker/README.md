@@ -23,17 +23,17 @@ Konsekuensinya, mode mixed ini tetap butuh dua syarat akun Cloudflare yang sama 
 
 Kalau kedua syarat itu belum ada, `wrangler dev` akan gagal start dengan pesan error yang jelas (baca pesannya, biasanya berisi link/perintah persis yang harus dijalankan).
 
-**Catatan untuk perintah `wrangler kv key put/get/delete` manual** (langkah 3 & 5 di bawah): wrangler v4 defaultnya menulis/membaca ke KV **lokal** simulasi, BUKAN cloud, walau sudah pakai flag `--preview`. Wajib tambah flag `--remote` secara eksplisit setiap kali provisioning/mencabut token supaya benar-benar mengenai namespace cloud (lihat contoh perintah di bawah — semua sudah include `--remote`).
+**Catatan untuk perintah `wrangler kv key put/get/delete` manual** (langkah 3 & 5 di bawah): wrangler v4 defaultnya menulis/membaca ke KV **lokal** simulasi, BUKAN cloud, walau sudah pakai flag `--preview`. Wajib tambah flag `--remote` secara eksplisit setiap kali provisioning/mencabut token supaya benar-benar mengenai namespace cloud (lihat contoh perintah di bawah — semua sudah include `--remote`). **Begitu binding punya `id` DAN `preview_id` sekaligus** (seperti `AUTH_TOKENS` di `wrangler.toml` proyek ini), wrangler v4 juga akan menolak jalan tanpa penjelasan target eksplisit — wajib tambah `--preview false` untuk mengenai namespace **production** (field `id`), atau `--preview` (tanpa `false`) untuk namespace **preview/dev** (field `preview_id`).
 
 1. Buat KV namespace production sekali (kalau belum ada): `wrangler kv namespace create AUTH_TOKENS`, tempel `id` yang muncul ke `wrangler.toml` (field `id`).
 2. Buat KV namespace **preview** untuk dev (wajib, terpisah dari langkah 1): `wrangler kv namespace create AUTH_TOKENS --preview`, tempel `preview_id` yang muncul ke binding yang sama di `wrangler.toml` (jadi satu blok `[[kv_namespaces]]` punya `id` dan `preview_id`).
 3. Generate token acak untuk tiap user (mis. `openssl rand -hex 24`), lalu simpan ke **kedua** namespace (production untuk deploy sungguhan, preview untuk dev lokal kamu sendiri) — **flag `--remote` wajib**, kalau lupa token hanya masuk ke KV simulasi lokal yang tidak pernah dibaca Worker sungguhan:
    ```
-   wrangler kv key put --binding=AUTH_TOKENS "<token-acak>" "<user-id-bebas>" --remote
-   wrangler kv key put --binding=AUTH_TOKENS "<token-acak>" "<user-id-bebas>" --preview --remote
+   wrangler kv key put --binding=AUTH_TOKENS "<token-acak>" "<user-id-bebas>" --remote --preview false
+   wrangler kv key put --binding=AUTH_TOKENS "<token-acak>" "<user-id-bebas>" --remote --preview
    ```
 4. Bagikan `<token-acak>` ke user lewat chat/dsb — mereka masukkan ke halaman Login di web app. `<user-id-bebas>` adalah partisi data komik user itu (`user_id` di setiap dokumen Astra), pilih string unik per orang (mis. nama).
-5. Untuk mencabut akses: `wrangler kv key delete --binding=AUTH_TOKENS "<token-acak>" --remote` (tambah `--preview` juga kalau mau cabut dari namespace dev).
+5. Untuk mencabut akses: `wrangler kv key delete --binding=AUTH_TOKENS "<token-acak>" --remote --preview false` (ganti `--preview false` jadi `--preview` untuk mencabut dari namespace dev).
 
 ## Deploy
 
@@ -55,8 +55,8 @@ Kalau kosong, Worker fallback ke `http://localhost:5173` saja (lihat
 mengurangi permukaan, bukan menutup lubang CSRF.
 
 Setelah `wrangler deploy`, provisioning token milikmu ke KV **production**
-(field `id`, bukan hanya `--preview`) supaya Worker ter-deploy mengenalinya:
-`wrangler kv key put --binding=AUTH_TOKENS "<token>" "<user-id>" --remote`.
+(field `id`, bukan `--preview`) supaya Worker ter-deploy mengenalinya:
+`wrangler kv key put --binding=AUTH_TOKENS "<token>" "<user-id>" --remote --preview false`.
 Web app di-host di Cloudflare Pages (`wrangler pages deploy apps/web/dist
 --project-name komik-tracker`); build web dengan `VITE_WORKER_URL` menunjuk URL
 Worker produksi (di-bake saat build, karena deploy Pages ini direct-upload
