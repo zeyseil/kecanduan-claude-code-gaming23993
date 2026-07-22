@@ -60,4 +60,41 @@ describe("CoverDropzone", () => {
       "data:image/png;base64,AAA",
     );
   });
+
+  it("tidak menampilkan tombol hapus cover saat onRemove tidak diberikan", () => {
+    render(<CoverDropzone value="data:image/png;base64,AAA" onFileSelected={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: /hapus cover/i })).not.toBeInTheDocument();
+  });
+
+  it("tidak menampilkan tombol hapus cover saat value kosong, walau onRemove diberikan", () => {
+    render(<CoverDropzone value={null} onFileSelected={vi.fn()} onRemove={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: /hapus cover/i })).not.toBeInTheDocument();
+  });
+
+  it("memanggil onRemove saat tombol hapus cover ditekan", async () => {
+    const user = userEvent.setup();
+    const onRemove = vi.fn();
+    render(
+      <CoverDropzone value="data:image/png;base64,AAA" onFileSelected={vi.fn()} onRemove={onRemove} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /hapus cover/i }));
+
+    expect(onRemove).toHaveBeenCalledTimes(1);
+  });
+
+  it("menonaktifkan tombol hapus cover saat disabled", () => {
+    render(
+      <CoverDropzone
+        value="data:image/png;base64,AAA"
+        onFileSelected={vi.fn()}
+        onRemove={vi.fn()}
+        disabled
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /hapus cover/i })).toBeDisabled();
+  });
 });
