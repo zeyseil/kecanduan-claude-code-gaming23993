@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from "react";
+import { useState } from "react";
+import { LineNumberedTextarea } from "./LineNumberedTextarea";
 
 interface TextEditorProps {
   /** Dipanggil saat tombol Proses ditekan. */
@@ -16,19 +17,6 @@ baru baca solo leveling ch179 tamat`;
 
 export function TextEditor({ onProcess, disabled = false }: TextEditorProps) {
   const [text, setText] = useState("");
-  const gutterRef = useRef<HTMLDivElement>(null);
-
-  const lineCount = useMemo(() => Math.max(text.split("\n").length, 1), [text]);
-  const lineNumbers = useMemo(
-    () => Array.from({ length: lineCount }, (_, i) => i + 1),
-    [lineCount],
-  );
-
-  const syncScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
-    if (gutterRef.current) {
-      gutterRef.current.scrollTop = e.currentTarget.scrollTop;
-    }
-  };
 
   const handleProcess = () => {
     const trimmed = text.trim();
@@ -38,26 +26,13 @@ export function TextEditor({ onProcess, disabled = false }: TextEditorProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex overflow-hidden rounded-lg border border-slate-700 bg-slate-900">
-        <div
-          ref={gutterRef}
-          aria-hidden="true"
-          className="max-h-[60vh] select-none overflow-hidden bg-slate-800 px-2 py-3 text-right font-mono text-sm leading-6 text-slate-500"
-        >
-          {lineNumbers.map((n) => (
-            <div key={n}>{n}</div>
-          ))}
-        </div>
-        <textarea
-          aria-label="Editor catatan komik"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onScroll={syncScroll}
-          spellCheck={false}
-          placeholder={PLACEHOLDER}
-          className="max-h-[60vh] min-h-[40vh] flex-1 resize-none bg-slate-900 px-3 py-3 font-mono text-sm leading-6 text-slate-100 placeholder:text-slate-600 focus:outline-none"
-        />
-      </div>
+      <LineNumberedTextarea
+        value={text}
+        onChange={setText}
+        ariaLabel="Editor catatan komik"
+        placeholder={PLACEHOLDER}
+        heightClassName="max-h-[60vh] min-h-[40vh]"
+      />
 
       <div className="flex justify-end">
         <button
