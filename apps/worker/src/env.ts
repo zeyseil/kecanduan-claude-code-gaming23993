@@ -9,9 +9,11 @@ export interface Env {
   /** Comma-separated list of browser origins allowed to call this Worker.
    * Empty/unset falls back to the local vite dev server. */
   ALLOWED_ORIGINS?: string;
-  /** Base URL instance Comix API self-hosted user (mis. https://comix.example.com).
-   * KOSONG = sumber Comix dilewati diam-diam (no-op), pipeline tetap jalan. */
-  COMIX_API_URL?: string;
+  /** (Opsional) Override base URL API comick.io. Kosong = default
+   * https://api.comick.dev (lihat lib/comick.ts). comick adalah sumber BAWAAN
+   * yang selalu aktif — env ini hanya escape-hatch kalau comick pindah domain
+   * lagi (fun→io→dev) atau kamu memakai proxy sendiri. */
+  COMICK_API_URL?: string;
   /** Base URL instance Komiku REST API (VernSG). Kosong = pakai default publik
    * di lib/komiku.ts. */
   KOMIKU_API_URL?: string;

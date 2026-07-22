@@ -20,7 +20,7 @@ const BULK_MATCH_THRESHOLD = 0.85;
 // sizes are capped well under that ceiling.
 const MAX_BULK_ENTRIES = 25;
 const MAX_BULK_DELETE = 25;
-// Each item can now hit up to FOUR sources (MangaDex, AniList, Comix, Komiku =
+// Each item can now hit up to FOUR sources (MangaDex, comick, AniList, Komiku =
 // up to 4 throttle + 4 fetch subrequests) plus Astra reads/writes. Workers free
 // plan caps subrequests at 50/invocation, so caps sit lower than before.
 const MAX_COVER_BACKFILL = 4;
@@ -325,7 +325,7 @@ comics.post("/bulk-delete", async (c) => {
   return c.json({ results });
 });
 
-// Second pass: fetch covers (MangaDex, AniList fallback) for comics created by bulk import
+// Second pass: fetch covers (MangaDex → comick → AniList → Komiku) for comics created by bulk import
 // (which always start with cover_url: null). Kept separate from /bulk itself
 // so cover lookups don't compete with comic writes for the subrequest budget.
 comics.post("/backfill-covers", async (c) => {
@@ -361,13 +361,13 @@ comics.post("/backfill-covers", async (c) => {
     if (coverUrl) {
       await store.updateComic(userId, comicId, { cover_url: coverUrl, source_api: info?.source ?? null });
     }
-    results.push({ comic_id: comicId, cover_url: coverUrl, reason: coverUrl ? undefined : "tidak ditemukan di MangaDex maupun AniList" });
+    results.push({ comic_id: comicId, cover_url: coverUrl, reason: coverUrl ? undefined : "tidak ditemukan di sumber cover manapun" });
   }
 
   return c.json({ results });
 });
 
-// Auto-detect comic type from MangaDex (AniList fallback) for import lines where the user didn't
+// Auto-detect comic type from MangaDex (comick/AniList/Komiku fallback) for import lines where the user didn't
 // write (jenis). Type only — is_adult is NEVER auto-detected (SPEC.md §8: 18+
 // must be explicit from the user, not a system guess). Returns type_tag: null
 // when no confident match / unmapped language, so the UI can flag the line
@@ -400,7 +400,7 @@ comics.post("/detect-type", async (c) => {
   for (const title of body.titles as string[]) {
     const info = await fetchComicInfo(title, c.env);
     if (!info) {
-      results.push({ title, type_tag: null, reason: "tidak ditemukan di MangaDex maupun AniList" });
+      results.push({ title, type_tag: null, reason: "tidak ditemukan di sumber cover manapun" });
     } else if (!info.type_tag) {
       results.push({ title, type_tag: null, reason: "jenis tidak dikenali dari bahasa/negara asal" });
     } else {

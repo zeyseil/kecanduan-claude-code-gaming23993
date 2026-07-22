@@ -3,9 +3,10 @@
 // wins for the cover, the first to provide a type wins for the type. As soon as
 // both are known we stop (no wasted requests / subrequest budget).
 //
-// Order (user decision, dogfooding slice): MangaDex → AniList → Comix → Komiku.
-// Comix/Komiku are self-hosted/third-party and skip themselves (return null)
-// when their env URL is unset, so the chain degrades gracefully.
+// Order (user decision): MangaDex → comick → AniList → Komiku. comick is a
+// public API called directly (like mangadex/anilist), always enabled. Komiku is
+// third-party/self-hosted and skips itself (returns null) when its env URL is
+// unset, so the chain degrades gracefully.
 //
 // Rate-limit slots are acquired HERE, per source actually called (and only when
 // that source is enabled) — callers must not acquire their own slots on top.
@@ -14,11 +15,11 @@ import type { Env } from "../env";
 import type { MangaDexInfo } from "./mangadex";
 import { fetchMangaDexInfo } from "./mangadex";
 import { fetchAniListInfo } from "./anilist";
-import { fetchComixInfo } from "./comix";
+import { fetchComickInfo } from "./comick";
 import { fetchKomikuInfo } from "./komiku";
 import {
   acquireAniListSlot,
-  acquireComixSlot,
+  acquireComickSlot,
   acquireKomikuSlot,
   acquireMangaDexSlot,
 } from "../durable-objects/RateLimiter";
@@ -47,16 +48,16 @@ export async function fetchComicInfo(title: string, env: Env): Promise<ComicInfo
       fetch: () => fetchMangaDexInfo(title),
     },
     {
+      name: "comick",
+      enabled: true,
+      acquire: () => acquireComickSlot(env.RATE_LIMITER),
+      fetch: () => fetchComickInfo(title, env),
+    },
+    {
       name: "anilist",
       enabled: true,
       acquire: () => acquireAniListSlot(env.RATE_LIMITER),
       fetch: () => fetchAniListInfo(title),
-    },
-    {
-      name: "comix",
-      enabled: !!env.COMIX_API_URL?.trim(),
-      acquire: () => acquireComixSlot(env.RATE_LIMITER),
-      fetch: () => fetchComixInfo(title, env),
     },
     {
       name: "komiku",

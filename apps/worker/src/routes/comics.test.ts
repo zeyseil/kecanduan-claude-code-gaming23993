@@ -804,7 +804,7 @@ describe("/comics", () => {
       });
       const body = (await res.json()) as { results: Array<{ cover_url: string | null; reason?: string }> };
       expect(body.results[0].cover_url).toBeNull();
-      expect(body.results[0].reason).toBe("tidak ditemukan di MangaDex maupun AniList");
+      expect(body.results[0].reason).toBe("tidak ditemukan di sumber cover manapun");
 
       vi.unstubAllGlobals();
     });

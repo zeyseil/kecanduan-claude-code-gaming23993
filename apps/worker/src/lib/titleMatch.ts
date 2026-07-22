@@ -1,5 +1,5 @@
 // Shared "is this the same comic?" gate for external metadata sources
-// (MangaDex, AniList, Comix, Komiku). One acceptance rule everywhere, so
+// (MangaDex, comick, AniList, Komiku). One acceptance rule everywhere, so
 // adding a source never adds a new definition of "match".
 //
 // Acceptance is three-tier (dogfooding showed a flat 0.85 bar rejects half the

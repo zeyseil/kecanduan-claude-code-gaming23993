@@ -12,6 +12,8 @@ const fakeEnv = {
 interface StubOptions {
   /** MangaDex entries (attributes.title echoes the query when "echo"). */
   mangadex: unknown[] | ((title: string) => unknown[]);
+  /** comick results (top-level array). Defaults to empty = comick misses. */
+  comick?: unknown[];
   anilist: unknown[];
 }
 
@@ -32,7 +34,7 @@ function aniListEntry(title: string, cover: string | null, country: string | nul
   };
 }
 
-function stubSources({ mangadex, anilist }: StubOptions) {
+function stubSources({ mangadex, comick, anilist }: StubOptions) {
   const calls: string[] = [];
   vi.stubGlobal(
     "fetch",
@@ -43,6 +45,10 @@ function stubSources({ mangadex, anilist }: StubOptions) {
         const queried = decodeURIComponent(new URL(u).searchParams.get("title") ?? "");
         const data = typeof mangadex === "function" ? mangadex(queried) : mangadex;
         return new Response(JSON.stringify({ data }), { status: 200 });
+      }
+      if (u.includes("api.comick.dev")) {
+        calls.push("comick");
+        return new Response(JSON.stringify(comick ?? []), { status: 200 });
       }
       if (u.includes("graphql.anilist.co")) {
         calls.push("anilist");
@@ -88,7 +94,8 @@ describe("fetchComicInfo", () => {
       type_tag: "manhwa",
       source: "anilist",
     });
-    expect(calls).toEqual(["mangadex", "anilist"]);
+    // comick sits between MangaDex and AniList and is always tried (misses here).
+    expect(calls).toEqual(["mangadex", "comick", "anilist"]);
   });
 
   it("fills a missing type_tag from AniList when MangaDex found the comic (kasus Unordinary)", async () => {
@@ -114,17 +121,16 @@ describe("fetchComicInfo", () => {
   });
 });
 
-describe("fetchComicInfo — Comix/Komiku fallback", () => {
-  const envWithBoth = {
+describe("fetchComicInfo — comick/Komiku fallback", () => {
+  const envWithKomiku = {
     ...fakeEnv,
-    COMIX_API_URL: "https://comix.example.com",
     KOMIKU_API_URL: "https://komiku.example.com",
   } as unknown as Env;
 
   function stubAll(opts: {
     mangadex?: unknown[];
+    comick?: unknown[];
     anilist?: unknown[];
-    comix?: unknown[];
     komiku?: unknown[];
   }) {
     const calls: string[] = [];
@@ -136,13 +142,13 @@ describe("fetchComicInfo — Comix/Komiku fallback", () => {
           calls.push("mangadex");
           return new Response(JSON.stringify({ data: opts.mangadex ?? [] }), { status: 200 });
         }
+        if (u.includes("api.comick.dev")) {
+          calls.push("comick");
+          return new Response(JSON.stringify(opts.comick ?? []), { status: 200 });
+        }
         if (u.includes("graphql.anilist.co")) {
           calls.push("anilist");
           return new Response(JSON.stringify({ data: { Page: { media: opts.anilist ?? [] } } }), { status: 200 });
-        }
-        if (u.includes("comix.example.com")) {
-          calls.push("comix");
-          return new Response(JSON.stringify({ data: opts.comix ?? [] }), { status: 200 });
         }
         if (u.includes("komiku.example.com")) {
           calls.push("komiku");
@@ -154,22 +160,26 @@ describe("fetchComicInfo — Comix/Komiku fallback", () => {
     return calls;
   }
 
-  it("falls through to Comix when MangaDex+AniList miss", async () => {
+  it("falls through to comick when MangaDex misses, before AniList", async () => {
     const calls = stubAll({
-      comix: [{ id: "1", title: "Local Title", img: "https://cdn/c.jpg", type: "manhwa" }],
+      comick: [{ title: "Local Title", country: "kr", md_covers: [{ b2key: "c.jpg" }] }],
     });
-    const info = await fetchComicInfo("Local Title", envWithBoth);
-    expect(info).toEqual({ cover_url: "https://cdn/c.jpg", type_tag: "manhwa", source: "comix" });
-    // Komiku never reached — Comix already completed the result.
-    expect(calls).toEqual(["mangadex", "anilist", "comix"]);
+    const info = await fetchComicInfo("Local Title", envWithKomiku);
+    expect(info).toEqual({
+      cover_url: "https://meo.comick.pictures/c.jpg",
+      type_tag: "manhwa",
+      source: "comick",
+    });
+    // AniList & Komiku never reached — comick already completed the result.
+    expect(calls).toEqual(["mangadex", "comick"]);
   });
 
   it("reaches Komiku only when every earlier source misses", async () => {
     const calls = stubAll({
       komiku: [{ title: "Komik Lokal", slug: "komik-lokal", thumbnail: "https://cdn/k.jpg", type: "Manhua" }],
     });
-    const info = await fetchComicInfo("Komik Lokal", envWithBoth);
+    const info = await fetchComicInfo("Komik Lokal", envWithKomiku);
     expect(info).toEqual({ cover_url: "https://cdn/k.jpg", type_tag: "manhua", source: "komiku" });
-    expect(calls).toEqual(["mangadex", "anilist", "comix", "komiku"]);
+    expect(calls).toEqual(["mangadex", "comick", "anilist", "komiku"]);
   });
 });
