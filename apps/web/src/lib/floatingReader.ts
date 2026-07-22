@@ -22,7 +22,13 @@ function floatingReaderUrl(comicId: string): string {
   // because this is a local hash-route URL, never sent over the network.
   const token = getAuthToken() ?? "";
   const params = new URLSearchParams({ comicId, token });
-  return `/floating-reader?${params.toString()}`;
+  // App uses HashRouter under Tauri (see main.tsx) — the route lives AFTER
+  // the `#`. A plain "/floating-reader" path (no hash) resolves to hash="" on
+  // load, which HashRouter treats as "/" — the companion window would render
+  // the full Shell/DaftarKomik instead of FloatingReader. Loading
+  // "index.html" explicitly (rather than "/") also avoids relying on the
+  // custom-protocol root resolving to it implicitly.
+  return `index.html#/floating-reader?${params.toString()}`;
 }
 
 /**
