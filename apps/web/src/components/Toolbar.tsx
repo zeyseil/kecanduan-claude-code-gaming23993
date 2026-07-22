@@ -28,6 +28,9 @@ interface ToolbarProps {
   canExport: boolean;
   onToggleSelect: () => void;
   selectMode: boolean;
+  /** Mode Aman: blur cover 18+ sampai dibuka. */
+  safeMode: boolean;
+  onToggleSafeMode: () => void;
 }
 
 export function Toolbar({
@@ -38,6 +41,8 @@ export function Toolbar({
   canExport,
   onToggleSelect,
   selectMode,
+  safeMode,
+  onToggleSafeMode,
 }: ToolbarProps) {
   const set = <K extends keyof ComicListOptions>(
     key: K,
@@ -45,7 +50,10 @@ export function Toolbar({
   ) => onChange({ ...options, [key]: value });
 
   return (
-    <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+    <>
+    {/* Menempel di bawah header saat scroll. top-14 ≈ tinggi header Shell;
+        z di bawah header (z-10) supaya header tetap menutupinya saat overlap. */}
+    <div className="sticky top-14 z-[5] -mx-4 mb-2 flex flex-col gap-2 border-b border-slate-800 bg-slate-950/95 px-4 py-2 backdrop-blur sm:flex-row sm:flex-wrap sm:items-center">
       <button
         type="button"
         onClick={onOpenSearch}
@@ -105,6 +113,19 @@ export function Toolbar({
       <div className="flex gap-2 sm:ml-auto">
         <button
           type="button"
+          onClick={onToggleSafeMode}
+          aria-pressed={safeMode}
+          title="Blur cover komik 18+"
+          className={`rounded-md border px-3 py-2 text-sm transition ${
+            safeMode
+              ? "border-emerald-600 bg-emerald-950/40 text-emerald-200"
+              : "border-slate-600 bg-slate-800 text-slate-300 hover:border-emerald-500 hover:text-emerald-200"
+          }`}
+        >
+          {safeMode ? "🛡️ Mode Aman: ON" : "Mode Aman: OFF"}
+        </button>
+        <button
+          type="button"
           onClick={onToggleSelect}
           className={`rounded-md border px-3 py-2 text-sm transition ${
             selectMode
@@ -125,5 +146,14 @@ export function Toolbar({
         </button>
       </div>
     </div>
+
+    {/* Batasan permanen fitur Mode Aman (dekat kontrolnya) — sesuai aturan CLAUDE.md. */}
+    <p className="mb-5 text-[11px] text-slate-500">
+      <span className="font-medium text-slate-400">Batasan Mode Aman:</span> sensor ini hanya blur
+      visual di browser, <strong>bukan proteksi keamanan</strong>. Siapa pun yang memegang perangkat
+      ini bisa membukanya, dan setelan tersimpan per-device. Pilihan buka cover hanya berlaku selama
+      sesi ini.
+    </p>
+    </>
   );
 }

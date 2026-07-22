@@ -18,6 +18,10 @@ export interface Comic {
   /** Catatan bebas user (mis. "hiatus", "S1 end", "baca di warungkomik").
    * null kalau tidak ada. Tidak pernah diisi AI. */
   note: string | null;
+  /** Asal metadata cover: "mangadex" | "anilist" | "comix" | "komiku" |
+   * gabungan (mis. "mangadex+anilist") | "manual" | null (belum pernah di-fetch).
+   * Opsional — dokumen lama tanpa field ini dinormalisasi ke null saat dibaca. */
+  source_api?: string | null;
   created_at: string;
   updated_at: string;
 }

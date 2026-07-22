@@ -22,6 +22,10 @@ interface ComicCardProps {
   onToggleSelect?: (comicId: string) => void;
   /** Toggle status ongoing/completed 1 klik — tombol muncul di pojok kiri-bawah saat pressed. */
   onToggleStatus?: (comic: Comic) => void;
+  /** Mode Aman aktif & cover ini belum dibuka: sensor cover kalau is_adult. */
+  blurred?: boolean;
+  /** Dipanggil saat user menekan "Tampilkan" pada cover 18+ tersensor. */
+  onReveal?: (comic: Comic) => void;
 }
 
 export function ComicCard({
@@ -34,7 +38,10 @@ export function ComicCard({
   isSelected,
   onToggleSelect,
   onToggleStatus,
+  blurred,
+  onReveal,
 }: ComicCardProps) {
+  const censored = Boolean(blurred && comic.is_adult);
   const handleClick = () => {
     if (isSelectable) {
       onToggleSelect?.(comic.comic_id);
@@ -60,7 +67,7 @@ export function ComicCard({
             alt={`Cover ${comic.title}`}
             loading="lazy"
             referrerPolicy="no-referrer"
-            className="h-full w-full object-cover"
+            className={`h-full w-full object-cover ${censored ? "scale-110 blur-2xl" : ""}`}
           />
         ) : (
           <div
@@ -68,6 +75,29 @@ export function ComicCard({
             className="flex h-full w-full items-center justify-center px-2 text-center text-xs text-slate-400"
           >
             Tanpa cover
+          </div>
+        )}
+
+        {censored && (
+          <div
+            data-testid="nsfw-overlay"
+            className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950/70 px-2 text-center"
+          >
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-rose-300">
+              Konten NSFW
+            </span>
+            {onReveal && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReveal(comic);
+                }}
+                className="rounded-md bg-rose-600/90 px-2 py-1 text-xs font-medium text-white hover:bg-rose-500"
+              >
+                Tampilkan
+              </button>
+            )}
           </div>
         )}
 

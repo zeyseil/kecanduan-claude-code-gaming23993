@@ -1,45 +1,95 @@
-// Single entry point for external comic metadata: MangaDex first, AniList as
-// fallback (user decision, dogfooding slice). Also merges: when MangaDex finds
-// the comic but can't answer everything (e.g. originalLanguage "en" on a
-// webtoon → no type_tag, the "Unordinary" case from the logs), AniList fills
-// the gaps instead of being skipped.
+// Single entry point for external comic metadata. Sources are tried in a fixed
+// priority order and their results MERGED: the first source to provide a cover
+// wins for the cover, the first to provide a type wins for the type. As soon as
+// both are known we stop (no wasted requests / subrequest budget).
 //
-// Rate-limit slots are acquired HERE, per source actually called — callers
-// must not acquire their own slots on top of this.
+// Order (user decision, dogfooding slice): MangaDex → AniList → Comix → Komiku.
+// Comix/Komiku are self-hosted/third-party and skip themselves (return null)
+// when their env URL is unset, so the chain degrades gracefully.
+//
+// Rate-limit slots are acquired HERE, per source actually called (and only when
+// that source is enabled) — callers must not acquire their own slots on top.
 
 import type { Env } from "../env";
 import type { MangaDexInfo } from "./mangadex";
 import { fetchMangaDexInfo } from "./mangadex";
 import { fetchAniListInfo } from "./anilist";
-import { acquireAniListSlot, acquireMangaDexSlot } from "../durable-objects/RateLimiter";
+import { fetchComixInfo } from "./comix";
+import { fetchKomikuInfo } from "./komiku";
+import {
+  acquireAniListSlot,
+  acquireComixSlot,
+  acquireKomikuSlot,
+  acquireMangaDexSlot,
+} from "../durable-objects/RateLimiter";
 
-export type ComicInfoSource = "mangadex" | "anilist" | "mangadex+anilist";
+export type ComicInfoSource = string;
 
 export interface ComicInfo extends MangaDexInfo {
+  /** Which source(s) contributed, e.g. "mangadex", "mangadex+anilist", "komiku". */
   source: ComicInfoSource;
 }
 
+interface Source {
+  name: string;
+  /** false = disabled (e.g. no env URL) → skipped without acquiring a slot. */
+  enabled: boolean;
+  acquire: () => Promise<void>;
+  fetch: () => Promise<MangaDexInfo | null>;
+}
+
 export async function fetchComicInfo(title: string, env: Env): Promise<ComicInfo | null> {
-  await acquireMangaDexSlot(env.RATE_LIMITER);
-  const mangadex = await fetchMangaDexInfo(title);
-  if (mangadex && mangadex.cover_url && mangadex.type_tag) {
-    return { ...mangadex, source: "mangadex" };
+  const sources: Source[] = [
+    {
+      name: "mangadex",
+      enabled: true,
+      acquire: () => acquireMangaDexSlot(env.RATE_LIMITER),
+      fetch: () => fetchMangaDexInfo(title),
+    },
+    {
+      name: "anilist",
+      enabled: true,
+      acquire: () => acquireAniListSlot(env.RATE_LIMITER),
+      fetch: () => fetchAniListInfo(title),
+    },
+    {
+      name: "comix",
+      enabled: !!env.COMIX_API_URL?.trim(),
+      acquire: () => acquireComixSlot(env.RATE_LIMITER),
+      fetch: () => fetchComixInfo(title, env),
+    },
+    {
+      name: "komiku",
+      enabled: !!env.KOMIKU_API_URL?.trim(),
+      acquire: () => acquireKomikuSlot(env.RATE_LIMITER),
+      fetch: () => fetchKomikuInfo(title, env),
+    },
+  ];
+
+  let coverUrl: string | null = null;
+  let typeTag: MangaDexInfo["type_tag"] = null;
+  const contributors: string[] = [];
+
+  for (const source of sources) {
+    if (coverUrl && typeTag) break; // already complete — stop early
+    if (!source.enabled) continue;
+
+    await source.acquire();
+    const info = await source.fetch();
+    if (!info) continue;
+
+    let contributed = false;
+    if (!coverUrl && info.cover_url) {
+      coverUrl = info.cover_url;
+      contributed = true;
+    }
+    if (!typeTag && info.type_tag) {
+      typeTag = info.type_tag;
+      contributed = true;
+    }
+    if (contributed) contributors.push(source.name);
   }
 
-  await acquireAniListSlot(env.RATE_LIMITER);
-  const anilist = await fetchAniListInfo(title);
-
-  if (!mangadex) {
-    return anilist ? { ...anilist, source: "anilist" } : null;
-  }
-  if (!anilist) {
-    return { ...mangadex, source: "mangadex" };
-  }
-  // MangaDex found the comic but with gaps — prefer its values, fill nulls
-  // from AniList.
-  return {
-    cover_url: mangadex.cover_url ?? anilist.cover_url,
-    type_tag: mangadex.type_tag ?? anilist.type_tag,
-    source: "mangadex+anilist",
-  };
+  if (!coverUrl && !typeTag) return null;
+  return { cover_url: coverUrl, type_tag: typeTag, source: contributors.join("+") };
 }

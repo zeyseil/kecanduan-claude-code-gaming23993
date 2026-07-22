@@ -140,4 +140,34 @@ describe("ComicCard", () => {
       screen.getByRole("button", { name: `Tandai ${c.title} sebagai ongoing` }),
     ).toBeInTheDocument();
   });
+
+  it("menyensor cover 18+ saat blurred (overlay NSFW), bukan komik biasa", () => {
+    const { rerender } = render(<ComicCard comic={comic({ is_adult: true })} blurred />);
+    expect(screen.getByTestId("nsfw-overlay")).toBeInTheDocument();
+
+    // Komik non-18+ tidak disensor walau blurred aktif.
+    rerender(<ComicCard comic={comic({ is_adult: false })} blurred />);
+    expect(screen.queryByTestId("nsfw-overlay")).not.toBeInTheDocument();
+  });
+
+  it("tidak menyensor cover 18+ kalau blurred tidak aktif", () => {
+    render(<ComicCard comic={comic({ is_adult: true })} />);
+    expect(screen.queryByTestId("nsfw-overlay")).not.toBeInTheDocument();
+  });
+
+  it("memanggil onReveal saat tombol 'Tampilkan' ditekan pada cover tersensor", async () => {
+    const user = userEvent.setup();
+    const onReveal = vi.fn();
+    const c = comic({ is_adult: true });
+    render(<ComicCard comic={c} blurred onReveal={onReveal} />);
+
+    await user.click(screen.getByRole("button", { name: "Tampilkan" }));
+
+    expect(onReveal).toHaveBeenCalledWith(c);
+  });
+
+  it("tidak menampilkan tombol 'Tampilkan' kalau onReveal tidak diberikan (mis. RecentStrip)", () => {
+    render(<ComicCard comic={comic({ is_adult: true })} blurred />);
+    expect(screen.queryByRole("button", { name: "Tampilkan" })).not.toBeInTheDocument();
+  });
 });
