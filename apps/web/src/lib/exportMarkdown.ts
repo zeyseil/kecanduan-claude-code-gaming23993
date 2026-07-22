@@ -1,24 +1,34 @@
 import type { Comic } from "../types/comic";
 import { formatChapter } from "./format";
 
-// Format per komik (dipilih user):
-//   ---
-//   Solo Leveling | manhwa | ch200 | 18+
-//   ---
-// Kolom terakhir "18+" hanya ada kalau is_adult; selain itu dikosongkan.
+// Format per komik — SENGAJA mengikuti sintaks yang diharapkan parser Import
+// Historis (lib/parseHistoris.ts), supaya file hasil export bisa ditempel
+// balik ke Bulk Import dan terbaca (roundtrip), bukan hanya untuk dibaca
+// manusia:
+//   Judul(jenis18) : chN(status_atau_catatan)
+// - Suffix "18" pada jenis = is_adult (konvensi yang sama dipakai parser
+//   import untuk data historis, lihat parseTypeTag).
+// - Bagian kurung setelah chapter: "completed" kalau status Tamat, ATAU
+//   catatan (`note`) kalau ada dan status Ongoing. Parser hanya mendukung
+//   SATU keterangan di posisi itu — kombinasi status Tamat DENGAN catatan
+//   TIDAK bisa dipertahankan lewat roundtrip ini (catatan akan hilang),
+//   ini batasan sintaks parser, bukan bug export.
+// - Judul yang mengandung "(" atau ":" akan salah ter-parse kalau diimpor
+//   ulang (parser memakai karakter itu sebagai delimiter) — batasan yang
+//   sama seperti data historis manual.
 
 /** Bangun satu baris data untuk satu komik. */
 function comicLine(comic: Comic): string {
-  const chapter = `ch${formatChapter(comic.latest_chapter)}`;
-  const adult = comic.is_adult ? "18+" : "";
-  return `${comic.title} | ${comic.type_tag} | ${chapter} | ${adult}`;
+  const typeWithAdult = comic.is_adult ? `${comic.type_tag}18` : comic.type_tag;
+  const chapter = formatChapter(comic.latest_chapter);
+  const trailing =
+    comic.status === "completed" ? "(completed)" : comic.note ? `(${comic.note})` : "";
+  return `${comic.title}(${typeWithAdult}) : ch${chapter}${trailing}`;
 }
 
 /** Susun seluruh isi file .md. Fungsi murni — mudah diuji tanpa DOM. */
 export function buildMarkdown(comics: Comic[]): string {
-  if (comics.length === 0) return "---\n";
-  const body = comics.map((comic) => `---\n${comicLine(comic)}`).join("\n");
-  return `${body}\n---\n`;
+  return comics.map((comic) => comicLine(comic)).join("\n");
 }
 
 /** Nama file dengan tanggal hari ini: komik-terbaca-YYYY-MM-DD.md */

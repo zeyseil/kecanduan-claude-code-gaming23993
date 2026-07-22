@@ -139,7 +139,11 @@ export function Toolbar({
           type="button"
           onClick={onExport}
           disabled={!canExport}
-          title={canExport ? "Unduh daftar komik sebagai file .md" : "Belum ada komik untuk diekspor"}
+          title={
+            canExport
+              ? "Unduh daftar komik sebagai file .md (bisa ditempel balik ke Bulk Import)"
+              : "Belum ada komik untuk diekspor"
+          }
           className="rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-300 hover:border-indigo-500 hover:text-slate-200 disabled:opacity-50 disabled:hover:border-slate-600 disabled:hover:text-slate-300"
         >
           Export .md
@@ -148,11 +152,19 @@ export function Toolbar({
     </div>
 
     {/* Batasan permanen fitur Mode Aman (dekat kontrolnya) — sesuai aturan CLAUDE.md. */}
-    <p className="mb-5 text-[11px] text-slate-500">
+    <p className="mb-2 text-[11px] text-slate-500">
       <span className="font-medium text-slate-400">Batasan Mode Aman:</span> sensor ini hanya blur
       visual di browser, <strong>bukan proteksi keamanan</strong>. Siapa pun yang memegang perangkat
       ini bisa membukanya, dan setelan tersimpan per-device. Pilihan buka cover hanya berlaku selama
       sesi ini.
+    </p>
+    {/* Batasan permanen fitur Export .md (roundtrip ke Bulk Import) — sesuai aturan CLAUDE.md. */}
+    <p className="mb-5 text-[11px] text-slate-500">
+      <span className="font-medium text-slate-400">Batasan Export .md:</span> format baris mengikuti
+      sintaks Bulk Import (<code>Judul(jenis) : chN</code>) supaya bisa ditempel balik. Cover, link
+      baca, dan hari rilis <strong>tidak ikut ter-export</strong> (bukan bagian format ini). Kombinasi
+      status Tamat + catatan tidak bisa dipertahankan sekaligus (catatan hilang), dan judul yang
+      mengandung "(" atau ":" akan salah terbaca kalau diimpor ulang.
     </p>
     </>
   );
