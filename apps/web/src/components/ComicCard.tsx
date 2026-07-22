@@ -67,7 +67,7 @@ export function ComicCard({
             alt={`Cover ${comic.title}`}
             loading="lazy"
             referrerPolicy="no-referrer"
-            className={`h-full w-full object-cover ${censored ? "scale-110 blur-2xl" : ""}`}
+            className={`h-full w-full object-contain ${censored ? "scale-110 blur-2xl" : ""}`}
           />
         ) : (
           <div
