@@ -20,7 +20,14 @@ PROCESS_LOG_COLLECTION=process_log
 # Keduanya dilewati diam-diam kalau dikosongkan — pipeline tetap jalan.
 #   COMIX_API_URL : base URL instance Comix API self-hosted-mu (Next.js), mis.
 #                   https://comix.example.com — WAJIB deploy sendiri dulu.
-#   KOMIKU_API_URL: base URL instance Komiku REST API (VernSG) yang sedang jalan.
+#   KOMIKU_API_URL: base URL instance Komiku REST API (VernSG). Sengaja TIDAK
+#                   di-default otomatis (tidak mau diam-diam membebani instance
+#                   publik orang lain) — isi sendiri kalau mau pakai:
+#                     - Instance publik proyeknya (dicek live, bisa dipakai
+#                       langsung tapi shared/gratis, bisa lambat/down kapan
+#                       saja): https://komiku-rest-api.vercel.app
+#                     - Atau deploy instance sendiri (lihat README bagian
+#                       "Sumber cover tambahan (Comix/Komiku)").
 # COMIX_API_URL=
 # KOMIKU_API_URL=
 

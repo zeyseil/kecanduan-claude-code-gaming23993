@@ -166,7 +166,7 @@ describe("fetchComicInfo — Comix/Komiku fallback", () => {
 
   it("reaches Komiku only when every earlier source misses", async () => {
     const calls = stubAll({
-      komiku: [{ title: "Komik Lokal", thumbnail: "https://cdn/k.jpg", type: "Manhua" }],
+      komiku: [{ title: "Komik Lokal", slug: "komik-lokal", thumbnail: "https://cdn/k.jpg", type: "Manhua" }],
     });
     const info = await fetchComicInfo("Komik Lokal", envWithBoth);
     expect(info).toEqual({ cover_url: "https://cdn/k.jpg", type_tag: "manhua", source: "komiku" });

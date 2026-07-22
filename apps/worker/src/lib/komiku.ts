@@ -1,12 +1,23 @@
 // Komiku API lookup — fourth external metadata source, last in the fallback
 // chain. Good for Indonesian/local titles that aren't on MangaDex/AniList.
 //
-// The VernSG Komiku REST API is a scraper whose /search JSON shape isn't
-// formally documented, so this adapter is deliberately DEFENSIVE: it accepts
-// several plausible field names for title/cover/type and returns null on any
-// mismatch rather than throwing. Gated on `env.KOMIKU_API_URL` (no-op if unset)
-// so a wrong/absent instance never breaks the pipeline — set the URL of a
-// running instance to enable it.
+// Verified live against https://komiku-rest-api.vercel.app/search?q=... (the
+// project's own public deployment): a real result looks like
+//   { status, message, keyword, url, total,
+//     data: [{ title, altTitle, slug, href, thumbnail, type, genre, description }] }
+// — confirming `data[]` + `title`/`thumbnail`/`type` as the primary field
+// names below. Kept DEFENSIVE regardless (extra field-name fallbacks, never
+// throws) since this is an unversioned scraper API that can change shape
+// without notice. Gated on `env.KOMIKU_API_URL` (no-op if unset) so a
+// wrong/absent instance never breaks the pipeline.
+//
+// Real quirk observed live: a query with NO actual match doesn't return an
+// empty data[] — it returns total:1 with a placeholder entry
+// { title: "Manga", slug: "", href: "/detail-komik//", thumbnail: "",
+//   source: "generic-parser" } (no `type` field at all). That placeholder
+// always has an empty `slug`/`href`, which real results never do, so entries
+// without a slug are filtered out before title-matching — otherwise "Manga"
+// could theoretically compete as a false candidate.
 
 import type { Env } from "../env";
 import type { TypeTag } from "../types/comic";
@@ -21,8 +32,15 @@ function str(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
+/** True for a real result. Filters out the "no match" placeholder entry
+ * (empty slug/href, no real data) seen live — see module comment. */
+function isRealResult(entry: KomikuResult): boolean {
+  return str(entry.slug) !== undefined || str(entry.href) !== undefined;
+}
+
 /** Title strings under any of the field names Komiku scrapers commonly use. */
 function titlesOf(entry: KomikuResult): string[] {
+  if (!isRealResult(entry)) return [];
   const t = str(entry.title) ?? str(entry.judul) ?? str(entry.name);
   return t ? [t] : [];
 }
