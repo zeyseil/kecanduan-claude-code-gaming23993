@@ -148,6 +148,10 @@ interface BulkEntry {
   latest_chapter?: unknown;
   status?: unknown;
   note?: unknown;
+  /** Optional — carried over from /detect-type when it already found a cover,
+   * so a newly-created comic doesn't need a separate backfill-covers round trip. */
+  cover_url?: unknown;
+  source_api?: unknown;
 }
 
 interface BulkResultItem {
@@ -155,6 +159,9 @@ interface BulkResultItem {
   action: "created" | "updated" | "skipped" | "error";
   comic_id?: string;
   reason?: string;
+  /** Present (possibly null) only for "created" — lets the client skip
+   * backfill-covers for entries that already got a cover from detect-type. */
+  cover_url?: string | null;
 }
 
 function validateBulkEntry(body: BulkEntry): string | null {
@@ -175,6 +182,12 @@ function validateBulkEntry(body: BulkEntry): string | null {
   }
   if (body.note !== undefined && body.note !== null && !isValidNote(body.note)) {
     return `note harus string maksimal ${MAX_NOTE_LENGTH} karakter atau null`;
+  }
+  if (body.cover_url !== undefined && body.cover_url !== null && typeof body.cover_url !== "string") {
+    return "cover_url harus string atau null";
+  }
+  if (body.source_api !== undefined && body.source_api !== null && typeof body.source_api !== "string") {
+    return "source_api harus string atau null";
   }
   return null;
 }
@@ -218,6 +231,8 @@ comics.post("/bulk", async (c) => {
       latest_chapter: rawEntry.latest_chapter as number,
       status: rawEntry.status as Status,
       note: (rawEntry.note as string | null | undefined)?.trim() || null,
+      cover_url: (rawEntry.cover_url as string | null | undefined) ?? null,
+      source_api: (rawEntry.source_api as string | null | undefined) ?? null,
     };
 
     const [best] = rankCandidates(existing, entry.title, 1);
@@ -255,7 +270,11 @@ comics.post("/bulk", async (c) => {
         is_adult: entry.is_adult,
         latest_chapter: entry.latest_chapter,
         status: entry.status,
-        cover_url: null,
+        // Carried over from /detect-type when it already found a cover (see
+        // BulkEntry comment) — null when detection didn't run/find one, same
+        // as before; backfill-covers remains the fallback for those.
+        cover_url: entry.cover_url,
+        source_api: entry.source_api,
         read_url: null,
         release_day: null,
         note: entry.note,
@@ -264,7 +283,7 @@ comics.post("/bulk", async (c) => {
       };
       await store.insertComic(userId, comic);
       existing.push(comic);
-      results.push({ title: entry.title, action: "created", comic_id: comic.comic_id });
+      results.push({ title: entry.title, action: "created", comic_id: comic.comic_id, cover_url: comic.cover_url });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       results.push({ title: entry.title, action: "error", reason: message });
@@ -368,7 +387,16 @@ comics.post("/detect-type", async (c) => {
     return c.json({ error: `titles maksimal ${MAX_DETECT_TITLES} per request` }, 400);
   }
 
-  const results: Array<{ title: string; type_tag: TypeTag | null; reason?: string }> = [];
+  const results: Array<{
+    title: string;
+    type_tag: TypeTag | null;
+    reason?: string;
+    // Only set alongside a resolved type_tag: an entry whose type detection
+    // fails isn't imported this round (client re-detects from scratch after
+    // the user fixes it), so there's no point carrying a cover for it.
+    cover_url?: string | null;
+    source_api?: string | null;
+  }> = [];
   for (const title of body.titles as string[]) {
     const info = await fetchComicInfo(title, c.env);
     if (!info) {
@@ -376,7 +404,10 @@ comics.post("/detect-type", async (c) => {
     } else if (!info.type_tag) {
       results.push({ title, type_tag: null, reason: "jenis tidak dikenali dari bahasa/negara asal" });
     } else {
-      results.push({ title, type_tag: info.type_tag });
+      // fetchComicInfo already fetched cover_url in this same call — capture
+      // it instead of discarding it, so a later backfill-covers call isn't
+      // needed to re-derive information we already have.
+      results.push({ title, type_tag: info.type_tag, cover_url: info.cover_url, source_api: info.source });
     }
   }
 

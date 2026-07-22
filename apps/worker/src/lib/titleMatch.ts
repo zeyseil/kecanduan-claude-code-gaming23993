@@ -41,13 +41,22 @@ const SUBSTRING_MIN_LENGTH_RATIO = 0.5;
  * near-empty, overly-generic fragment (e.g. "Season 2: ..."). */
 const CORE_TITLE_MIN_CHARS = 8;
 
-/** Text before the first ":" or "~" (whichever comes first), if that leaves a
- * substantial fragment — null when there's no separator or the fragment is
- * too short/generic to be a safe extra candidate. */
+/** Text before the first ":", "~", or "," (whichever comes first), if that
+ * leaves a substantial fragment — null when there's no separator or the
+ * fragment is too short/generic to be a safe extra candidate.
+ *
+ * "," is included because some official titles extend the core with a
+ * comma-joined clause BEFORE the "~subtitle~"/": subtitle" tail (dogfooding
+ * case: "Kuni wo Owareta Ryuushi-san, Hirowareta Ringoku de Ukkari Musou
+ * Shite Shimau. ~Jakushou Kokka ga...~" — cutting only at the tilde still
+ * leaves the comma-joined clause attached, so the derived core is still too
+ * long to score above threshold against the short query). Taking the
+ * leftmost separator naturally picks the shortest/most conservative core. */
 function deriveCoreTitle(title: string): string | null {
   const colonIndex = title.indexOf(":");
   const tildeIndex = title.indexOf("~");
-  const candidates = [colonIndex, tildeIndex].filter((i) => i >= 0);
+  const commaIndex = title.indexOf(",");
+  const candidates = [colonIndex, tildeIndex, commaIndex].filter((i) => i >= 0);
   if (candidates.length === 0) return null;
 
   const cut = Math.min(...candidates);

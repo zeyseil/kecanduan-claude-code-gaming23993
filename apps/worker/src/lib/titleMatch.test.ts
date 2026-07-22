@@ -62,6 +62,27 @@ describe("isAcceptableTitleMatch", () => {
       ]),
     ).toBe(false);
   });
+
+  it("cuts at the leftmost of multiple separators (comma before tilde), not just the first type checked (kasus log)", () => {
+    // Real MangaDex title — TWO layers of extension: a comma-joined clause
+    // before the "~subtitle~" tail. Cutting only at the tilde (the original
+    // fix) still leaves the comma clause attached, which is still too long
+    // relative to the short query to clear any tier.
+    expect(
+      isAcceptableTitleMatch("kuni wo owareta ryuushi-san", [
+        "Kuni wo Owareta Ryuushi-san, Hirowareta Ringoku de Ukkari Musou Shite Shimau. ~Jakushou Kokka ga Tairiku Saikyou no Ryuu no Rakuen ni Naru made~",
+      ]),
+    ).toBe(true);
+  });
+
+  it("does not turn a bare, unpunctuated truncation into a match (kasus log, batasan yang diketahui)", () => {
+    // Real MangaDex title with no ":"/"~"/"," anywhere between the matching
+    // part and the extra text — nothing for deriveCoreTitle to cut at, so
+    // this correctly stays unmatched (documented limitation, not a bug).
+    expect(
+      isAcceptableTitleMatch("CMYK - sameda", ["CMYK - Sameda Kazuou wa Chuunibyou ga Naosenai"]),
+    ).toBe(false);
+  });
 });
 
 describe("pickBestTitleMatch", () => {

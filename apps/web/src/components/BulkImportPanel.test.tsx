@@ -140,8 +140,52 @@ describe("BulkImportPanel", () => {
     await user.click(screen.getByRole("button", { name: /import 1 entri/i }));
     expect(detectTypesMock).toHaveBeenCalledWith(["Solo Leveling"]);
     expect(bulkImportComicsMock).toHaveBeenCalledWith([
-      { title: "Solo Leveling", type_tag: "manhwa", is_adult: false, latest_chapter: 179, status: "ongoing", note: null },
+      {
+        title: "Solo Leveling",
+        type_tag: "manhwa",
+        is_adult: false,
+        latest_chapter: 179,
+        status: "ongoing",
+        note: null,
+        cover_url: null,
+        source_api: null,
+      },
     ]);
+  });
+
+  it("meneruskan cover_url/source_api dari deteksi jenis, dan melewati tombol Ambil cover kalau semua sudah dapat cover", async () => {
+    detectTypesMock.mockResolvedValue([
+      { title: "Solo Leveling", type_tag: "manhwa", cover_url: "https://cdn/sl.jpg", source_api: "mangadex" },
+    ]);
+    bulkImportComicsMock.mockResolvedValue([
+      { title: "Solo Leveling", action: "created", comic_id: "c-1", cover_url: "https://cdn/sl.jpg" },
+    ]);
+    const user = userEvent.setup();
+    render(<BulkImportPanel />);
+
+    await user.type(screen.getByLabelText(/teks data historis/i), "Solo Leveling:ch179");
+    await user.click(screen.getByRole("button", { name: /preview/i }));
+    await user.click(screen.getByRole("button", { name: /deteksi jenis otomatis/i }));
+    await screen.findByText(/1 siap import, 0 perlu deteksi jenis/i);
+    await user.click(screen.getByRole("button", { name: /import 1 entri/i }));
+
+    expect(bulkImportComicsMock).toHaveBeenCalledWith([
+      {
+        title: "Solo Leveling",
+        type_tag: "manhwa",
+        is_adult: false,
+        latest_chapter: 179,
+        status: "ongoing",
+        note: null,
+        cover_url: "https://cdn/sl.jpg",
+        source_api: "mangadex",
+      },
+    ]);
+    expect(
+      await screen.findByText(/semua 1 komik baru sudah dapat cover otomatis/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /ambil cover/i })).not.toBeInTheDocument();
+    expect(backfillCoversMock).not.toHaveBeenCalled();
   });
 
   it("judul yang gagal dideteksi tetap tidak bisa diimport (tidak ditebak)", async () => {
