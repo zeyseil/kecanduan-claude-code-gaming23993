@@ -99,52 +99,44 @@ tidak di `wrangler dev`. Untuk mengetes handler-nya lokal:
 `wrangler dev --test-scheduled`, lalu
 `curl "localhost:8787/__scheduled?cron=0+3+*+*+*"`.
 
-## Sumber cover tambahan (Comix/Komiku)
+## Sumber cover tambahan (comick/Komiku)
 
-Worker mencoba 4 sumber metadata cover berurutan: MangaDex → AniList → Comix →
-Komiku (lihat `src/lib/comicInfo.ts`). Dua yang terakhir opsional — kosongkan
-`COMIX_API_URL`/`KOMIKU_API_URL` untuk melewatinya. Kalau mau diaktifkan:
+Worker mencoba 4 sumber metadata cover berurutan: MangaDex → comick → AniList →
+Komiku (lihat `src/lib/comicInfo.ts`).
 
-### Komiku (VernSG/Komiku-Rest-Api) — opsi cepat, tanpa deploy
-Proyeknya sudah punya instance publik yang **diverifikasi live** saat sesi ini:
-`https://komiku-rest-api.vercel.app`. Bisa langsung dipakai:
+### comick.io — sumber BAWAAN, nol setup
+comick dipanggil **langsung** dari Worker (seperti MangaDex/AniList), jadi tidak
+perlu deploy/instance apa pun. Base URL default `https://api.comick.dev`.
+
+`COMICK_API_URL` bersifat **opsional** — set hanya kalau perlu override base URL
+default, mis. kalau comick pindah domain lagi (riwayatnya: `fun` → `io` → `dev`)
+atau kamu ingin melewatkannya lewat proxy sendiri. Catatan: comick di belakang
+Cloudflare dan dipanggil dengan User-Agent browser; kalau suatu saat comick
+memperketat proteksi (TLS/JA3), gejalanya request comick gagal diam-diam dan
+rantai jatuh ke AniList/Komiku — bukan error fatal.
+
+### Komiku (VernSG/Komiku-Rest-Api) — opsional, dicoba terakhir
+Kosongkan `KOMIKU_API_URL` untuk melewatinya. Proyeknya punya instance publik
+yang **diverifikasi live**: `https://komiku-rest-api.vercel.app`. Bisa langsung
+dipakai:
 ```
 KOMIKU_API_URL=https://komiku-rest-api.vercel.app
 ```
 Ini instance gratis/shared milik orang lain (bukan milikmu) — bisa lambat,
-di-rate-limit, atau down kapan saja tanpa pemberitahuan. Untuk pemakaian
-serius, deploy instance sendiri (langkah di bawah).
+di-rate-limit, atau down kapan saja. Untuk pemakaian serius, deploy instance
+sendiri ke Vercel:
 
-### Deploy instance sendiri ke Vercel
-Kedua repo sudah siap-deploy ke Vercel tanpa konfigurasi tambahan (Komiku
-sudah punya `vercel.json`, Comix adalah aplikasi Next.js native Vercel).
-
-**Cara tercepat (tanpa clone lokal), untuk keduanya:**
 1. Login ke [vercel.com](https://vercel.com) (bisa pakai akun GitHub).
 2. Dashboard → **Add New… → Project**.
-3. **Import Git Repository** → tempel URL repo:
-   - Komiku: `https://github.com/VernSG/Komiku-Rest-Api`
-   - Comix: `https://github.com/yurtzy/comix-api`
-   (Kalau repo belum muncul di daftar, pilih **Import Third-Party Git
-   Repository** dan tempel URL-nya langsung — tidak perlu fork dulu.)
-4. Vercel otomatis mendeteksi frameworknya (Node/Express untuk Komiku, Next.js
-   untuk Comix) — biarkan setting default, tidak perlu env var tambahan untuk
-   deploy dasar.
-5. Klik **Deploy**, tunggu build selesai (~1-2 menit).
-6. Salin URL hasil deploy (mis. `https://komiku-rest-api-<hash>.vercel.app`
-   atau `https://comix-api-<hash>.vercel.app`) → isi ke `COMIX_API_URL`/
-   `KOMIKU_API_URL` di `.dev.vars` (dev) atau `wrangler secret put
-   COMIX_API_URL` / `wrangler secret put KOMIKU_API_URL` (prod).
+3. **Import Git Repository** → tempel `https://github.com/VernSG/Komiku-Rest-Api`
+   (kalau belum muncul, pilih **Import Third-Party Git Repository** dan tempel
+   URL-nya langsung — tidak perlu fork dulu).
+4. Repo sudah punya `vercel.json`; biarkan setting default, tidak perlu env var
+   tambahan untuk fungsi dasar search+cover.
+5. **Deploy**, tunggu ~1-2 menit, salin URL hasilnya → isi ke `KOMIKU_API_URL`
+   di `.dev.vars` (dev) atau `wrangler secret put KOMIKU_API_URL` (prod).
 
-**Alternatif via CLI** (kalau sudah `git clone` reponya sendiri):
-```
-npm i -g vercel
-cd Komiku-Rest-Api   # atau comix-api
-vercel               # ikuti prompt interaktif, "Deploy" di akhir
-```
-
-Vercel free tier (Hobby) cukup untuk kebutuhan personal ini — kedua repo tidak
-butuh database/secret untuk fungsi dasar search+cover yang dipakai di sini.
+Vercel free tier (Hobby) cukup untuk kebutuhan personal ini.
 
 ## Scripts
 
