@@ -8,6 +8,7 @@ import { userAuth } from "../middleware/userAuth";
 import { rateLimit } from "../middleware/rateLimit";
 import type { Role } from "../lib/authValue";
 import { fetchComicInfo } from "../lib/comicInfo";
+import { findNextChapterUrl } from "../lib/comickChapters";
 
 // Deterministic import path (no AI): score >= this means "same comic", so the
 // entry updates latest_chapter instead of creating a duplicate. Chosen higher
@@ -412,6 +413,29 @@ comics.post("/detect-type", async (c) => {
   }
 
   return c.json({ results });
+});
+
+// "Cari link chapter berikutnya" (EditComicForm) — finds the chapter right
+// after this comic's stored latest_chapter on comick.dev and returns a direct
+// reader URL. Does NOT write to the store itself; the client fills its local
+// read_url form field and the user still clicks Simpan, same as the cover
+// retry button. comick's `hid` is used transiently inside findNextChapterUrl
+// and is never persisted or returned here.
+comics.post("/fetch-read-url", async (c) => {
+  const body = await c.req.json<{ comic_id?: unknown }>().catch(() => ({}) as { comic_id?: unknown });
+  if (typeof body.comic_id !== "string" || body.comic_id.trim() === "") {
+    return c.json({ error: "comic_id harus string" }, 400);
+  }
+
+  const userId = c.get("userId");
+  const store = getComicStore(c.env);
+  const comic = await store.findComic(userId, body.comic_id);
+  if (!comic) {
+    return c.json({ read_url: null, reason: "comic tidak ditemukan" }, 404);
+  }
+
+  const result = await findNextChapterUrl(comic.title, comic.latest_chapter, c.env);
+  return c.json(result);
 });
 
 comics.patch("/:id", async (c) => {

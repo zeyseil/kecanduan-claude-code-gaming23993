@@ -38,6 +38,9 @@ import { Pagination } from "../components/Pagination";
 import { ContinueReadingPrompt } from "../components/ContinueReadingPrompt";
 import { takeReadingSession } from "../lib/readingSession";
 import { readComicCache, writeComicCache } from "../lib/comicCache";
+import { isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { COMIC_UPDATED_EVENT } from "../lib/floatingReader";
 
 const RECENT_LIMIT = 8;
 // Server membatasi 25 comic per request bulk-delete (MAX_BULK_DELETE). Client
@@ -82,7 +85,12 @@ export function DaftarKomik() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  // Jalur non-Tauri: prompt update chapter muncul saat tab kembali visible.
+  // Di Tauri, FloatingReader (window companion always-on-top) menggantikan
+  // peran ini — mendaftarkan listener ini juga di Tauri akan memicu prompt
+  // dobel begitu user akhirnya kembali fokus ke window utama.
   useEffect(() => {
+    if (isTauri()) return;
     const handleVisibilityChange = () => {
       if (document.visibilityState !== "visible") return;
       const comicId = takeReadingSession();
@@ -95,6 +103,19 @@ export function DaftarKomik() {
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+
+  // Tauri only: FloatingReader (window companion) meng-emit event ini setelah
+  // berhasil update chapter dari luar window utama — merge ke state lokal
+  // tanpa refetch penuh, sama seperti alur handleEditSubmit.
+  useEffect(() => {
+    if (!isTauri()) return;
+    const unlisten = listen<Comic>(COMIC_UPDATED_EVENT, (event) => {
+      setComics((prev) => prev.map((c) => (c.comic_id === event.payload.comic_id ? event.payload : c)));
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
   }, []);
 
   const loadComics = (background = false) => {

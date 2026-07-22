@@ -57,13 +57,62 @@ interface ComickTitle {
   title?: string;
 }
 
-interface ComickResult {
-  /** comick's stable id — for future comic/chapter (reading) lookups; unused today. */
+export interface ComickResult {
+  /** comick's stable id — used by comickChapters.ts to look up this comic's chapter list. */
   hid?: string;
+  /** comic's URL slug, e.g. "00-solo-leveling" — needed to build a comick.dev reader URL. */
+  slug?: string;
   title?: string;
   country?: string;
   md_titles?: ComickTitle[];
   md_covers?: ComickCover[];
+}
+
+/** Base host resolution shared with comickChapters.ts — comick has changed domains
+ * before (fun→io→dev), so both call sites honor the same env override. */
+export function comickBase(env: Env): string {
+  return (env.COMICK_API_URL?.trim() || DEFAULT_BASE).replace(/\/$/, "");
+}
+
+/** comick's browser-only-UA requirement (see module comment) — exported so
+ * comickChapters.ts's chapter-list fetch uses the identical header. */
+export { BROWSER_UA };
+
+/**
+ * Searches comick.io by title and returns the best-matching result (raw, with
+ * `hid`/`slug` intact) or null if no request succeeds / no result is a
+ * confident title match. Shared by fetchComickInfo (cover/type lookup) and
+ * comickChapters.ts (next-chapter lookup) so there's one search implementation.
+ */
+export async function searchComickMatch(title: string, env: Env): Promise<ComickResult | null> {
+  const base = comickBase(env);
+  const url = `${base}/v1.0/search/?q=${encodeURIComponent(title)}&limit=10&page=1`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: { "User-Agent": BROWSER_UA } });
+  } catch (err) {
+    console.error(`searchComickMatch: request error for "${title}": ${String(err)}`);
+    return null;
+  }
+  if (!res.ok) {
+    console.error(`searchComickMatch: search failed (${res.status} ${res.statusText}) for "${title}"`);
+    return null;
+  }
+
+  const body = (await res.json().catch(() => null)) as unknown;
+  const entries: ComickResult[] = Array.isArray(body) ? (body as ComickResult[]) : [];
+  if (entries.length === 0) {
+    console.error(`searchComickMatch: no result for "${title}"`);
+    return null;
+  }
+
+  const match = pickBestTitleMatch(entries, title, titlesOf);
+  if (!match) {
+    console.error(`searchComickMatch: kandidat untuk "${title}" tidak lolos ambang kemiripan`);
+    return null;
+  }
+  return match;
 }
 
 function str(value: unknown): string | undefined {
@@ -91,33 +140,7 @@ function typeTagFrom(country: string | undefined): TypeTag | null {
  * no result is a confident title match (shared acceptance rule — lib/titleMatch.ts).
  */
 export async function fetchComickInfo(title: string, env: Env): Promise<MangaDexInfo | null> {
-  const base = env.COMICK_API_URL?.trim() || DEFAULT_BASE;
-  const url = `${base.replace(/\/$/, "")}/v1.0/search/?q=${encodeURIComponent(title)}&limit=10&page=1`;
-
-  let res: Response;
-  try {
-    res = await fetch(url, { headers: { "User-Agent": BROWSER_UA } });
-  } catch (err) {
-    console.error(`fetchComickInfo: request error for "${title}": ${String(err)}`);
-    return null;
-  }
-  if (!res.ok) {
-    console.error(`fetchComickInfo: search failed (${res.status} ${res.statusText}) for "${title}"`);
-    return null;
-  }
-
-  const body = (await res.json().catch(() => null)) as unknown;
-  const entries: ComickResult[] = Array.isArray(body) ? (body as ComickResult[]) : [];
-  if (entries.length === 0) {
-    console.error(`fetchComickInfo: no result for "${title}"`);
-    return null;
-  }
-
-  const match = pickBestTitleMatch(entries, title, titlesOf);
-  if (!match) {
-    console.error(`fetchComickInfo: kandidat untuk "${title}" tidak lolos ambang kemiripan`);
-    return null;
-  }
-
+  const match = await searchComickMatch(title, env);
+  if (!match) return null;
   return { cover_url: coverUrlFrom(match), type_tag: typeTagFrom(match.country) };
 }

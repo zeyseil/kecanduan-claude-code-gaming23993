@@ -7,13 +7,15 @@ import * as comicsApi from "../lib/api/comics";
 
 vi.mock("../lib/api/comics", async () => {
   const actual = await vi.importActual<typeof comicsApi>("../lib/api/comics");
-  return { ...actual, detectTypes: vi.fn() };
+  return { ...actual, detectTypes: vi.fn(), fetchNextChapterReadUrl: vi.fn() };
 });
 
 const detectTypesMock = vi.mocked(comicsApi.detectTypes);
+const fetchNextChapterReadUrlMock = vi.mocked(comicsApi.fetchNextChapterReadUrl);
 
 beforeEach(() => {
   detectTypesMock.mockReset();
+  fetchNextChapterReadUrlMock.mockReset();
 });
 
 const COMIC: Comic = {
@@ -215,6 +217,60 @@ describe("EditComicForm", () => {
     render(<EditComicForm comic={COMIC} onSubmit={vi.fn()} onDelete={vi.fn()} onCancel={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: /coba ambil cover otomatis/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Worker sedang down");
+  });
+
+  it("tombol 'Cari link chapter berikutnya' selalu tampil, meski read_url sudah terisi", () => {
+    render(
+      <EditComicForm
+        comic={{ ...COMIC, read_url: "https://comick.dev/comic/x/y-chapter-1-en" }}
+        onSubmit={vi.fn()}
+        onDelete={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /cari link chapter berikutnya/i })).toBeInTheDocument();
+  });
+
+  it("mengisi Link Baca dari hasil fetchNextChapterReadUrl, tanpa auto-save", async () => {
+    fetchNextChapterReadUrlMock.mockResolvedValue({
+      read_url: "https://comick.dev/comic/one-piece/abc-chapter-1121-en",
+    });
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<EditComicForm comic={COMIC} onSubmit={onSubmit} onDelete={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: /cari link chapter berikutnya/i }));
+
+    expect(fetchNextChapterReadUrlMock).toHaveBeenCalledWith(COMIC.comic_id);
+    expect(await screen.findByLabelText(/link baca/i)).toHaveValue(
+      "https://comick.dev/comic/one-piece/abc-chapter-1121-en",
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("menampilkan reason saat chapter berikutnya tidak ditemukan", async () => {
+    fetchNextChapterReadUrlMock.mockResolvedValue({
+      read_url: null,
+      reason: "Chapter berikutnya tidak ditemukan di comick.dev",
+    });
+    const user = userEvent.setup();
+    render(<EditComicForm comic={COMIC} onSubmit={vi.fn()} onDelete={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: /cari link chapter berikutnya/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Chapter berikutnya tidak ditemukan di comick.dev",
+    );
+  });
+
+  it("menampilkan pesan error saat fetchNextChapterReadUrl gagal (network/exception)", async () => {
+    fetchNextChapterReadUrlMock.mockRejectedValue(new Error("Worker sedang down"));
+    const user = userEvent.setup();
+    render(<EditComicForm comic={COMIC} onSubmit={vi.fn()} onDelete={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: /cari link chapter berikutnya/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Worker sedang down");
   });

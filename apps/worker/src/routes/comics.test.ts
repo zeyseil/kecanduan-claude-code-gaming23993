@@ -810,6 +810,121 @@ describe("/comics", () => {
     });
   });
 
+  describe("POST /comics/fetch-read-url", () => {
+    it("rejects requests without a valid Authorization token", async () => {
+      const res = await app.request(
+        "/comics/fetch-read-url",
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ comic_id: "x" }) },
+        testEnv,
+      );
+      expect(res.status).toBe(401);
+    });
+
+    it("rejects a missing/invalid comic_id", async () => {
+      const res = await request("/comics/fetch-read-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("reports comic not found", async () => {
+      const res = await request("/comics/fetch-read-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comic_id: "missing-id" }),
+      });
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { read_url: null; reason: string };
+      expect(body).toEqual({ read_url: null, reason: "comic tidak ditemukan" });
+    });
+
+    it("finds the next chapter's comick.dev reader URL for an existing comic", async () => {
+      const createRes = await request("/comics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "Solo Leveling",
+          type_tag: "manhwa",
+          is_adult: false,
+          latest_chapter: 200,
+          status: "ongoing",
+        }),
+      });
+      const created = (await createRes.json()) as Comic;
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          const u = String(url);
+          if (u.includes("/v1.0/search/")) {
+            return new Response(
+              JSON.stringify([
+                { hid: "71gMd0vF", slug: "00-solo-leveling", title: "Solo Leveling", country: "kr", md_titles: [], md_covers: [] },
+              ]),
+              { status: 200 },
+            );
+          }
+          if (u.includes("/chapters")) {
+            return new Response(
+              JSON.stringify({ chapters: [{ hid: "bbb", chap: "201", lang: "en" }, { hid: "ccc", chap: "200", lang: "en" }] }),
+              { status: 200 },
+            );
+          }
+          return new Response("not found", { status: 404 });
+        }),
+      );
+
+      const res = await request("/comics/fetch-read-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comic_id: created.comic_id }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { read_url: string | null };
+      expect(body.read_url).toBe("https://comick.dev/comic/00-solo-leveling/bbb-chapter-201-en");
+
+      vi.unstubAllGlobals();
+    });
+
+    it("returns a reason without writing anything when comick has no next chapter", async () => {
+      const createRes = await request("/comics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "Judul Antah Berantah",
+          type_tag: "manga",
+          is_adult: false,
+          latest_chapter: 1,
+          status: "ongoing",
+        }),
+      });
+      const created = (await createRes.json()) as Comic;
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })),
+      );
+
+      const res = await request("/comics/fetch-read-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comic_id: created.comic_id }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { read_url: string | null; reason?: string };
+      expect(body.read_url).toBeNull();
+      expect(body.reason).toBe("Komik tidak ditemukan di comick.dev");
+
+      const listRes = await request("/comics");
+      const list = (await listRes.json()) as Comic[];
+      expect(list.find((c) => c.comic_id === created.comic_id)?.read_url ?? null).toBeNull();
+
+      vi.unstubAllGlobals();
+    });
+  });
+
   describe("POST /comics/detect-type", () => {
     it("rejects requests without a valid Authorization token", async () => {
       const res = await app.request(

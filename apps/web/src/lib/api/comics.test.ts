@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { deleteComic, fetchComics, patchComic, postComic } from "./comics";
+import { deleteComic, fetchComics, fetchNextChapterReadUrl, patchComic, postComic } from "./comics";
 import type { Comic } from "../../types/comic";
 
 const SAMPLE: Comic = {
@@ -197,5 +197,51 @@ describe("deleteComic", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(deleteComic("missing")).rejects.toThrow("comic tidak ditemukan");
+  });
+});
+
+describe("fetchNextChapterReadUrl", () => {
+  it("mengirim POST ke /comics/fetch-read-url dengan comic_id dan mengembalikan read_url", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ read_url: "https://comick.dev/comic/x/y-chapter-2-en" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchNextChapterReadUrl("1");
+
+    expect(result).toEqual({ read_url: "https://comick.dev/comic/x/y-chapter-2-en" });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8787/comics/fetch-read-url",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer test-token" },
+        body: JSON.stringify({ comic_id: "1" }),
+      }),
+    );
+  });
+
+  it("mengembalikan reason (bukan throw) saat status non-OK membawa body reason", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: () => Promise.resolve({ read_url: null, reason: "comic tidak ditemukan" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchNextChapterReadUrl("missing");
+
+    expect(result).toEqual({ read_url: null, reason: "comic tidak ditemukan" });
+  });
+
+  it("throw saat status non-OK tanpa body reason (mis. 401 auth)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: () => Promise.resolve({ error: "unauthorized" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchNextChapterReadUrl("1")).rejects.toThrow("unauthorized");
   });
 });

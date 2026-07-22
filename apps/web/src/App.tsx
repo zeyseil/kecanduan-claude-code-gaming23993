@@ -3,6 +3,7 @@ import { NavLink, Route, Routes } from "react-router-dom";
 import { DaftarKomik } from "./routes/DaftarKomik";
 import { Tulis } from "./routes/Tulis";
 import { Login } from "./routes/Login";
+import { FloatingReader } from "./routes/FloatingReader";
 import { Admin } from "./routes/Admin";
 import { RequireAuth } from "./components/RequireAuth";
 import { RequireAdmin } from "./components/RequireAdmin";
@@ -39,6 +40,8 @@ export function App() {
     <Routes>
       {/* Login berdiri sendiri (split-screen full-page), di luar shell aplikasi. */}
       <Route path="/login" element={<Login />} />
+      {/* Konten window companion Tauri (always-on-top) — tidak pernah dinavigasi dari UI web biasa. */}
+      <Route path="/floating-reader" element={<FloatingReader />} />
       <Route path="*" element={<Shell isAdmin={isAdmin} />} />
     </Routes>
   );

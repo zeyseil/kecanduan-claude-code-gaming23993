@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { Comic, TypeTag } from "../types/comic";
 import { RELEASE_DAY_LABELS, TYPE_TAGS } from "../types/comic";
-import { detectTypes, type ComicPatch } from "../lib/api/comics";
+import { detectTypes, fetchNextChapterReadUrl, type ComicPatch } from "../lib/api/comics";
 import { readFileAsDataUrl } from "../lib/cropImage";
 import { CoverDropzone } from "./CoverDropzone";
 import { ImageCropModal } from "./ImageCropModal";
@@ -37,6 +37,7 @@ export function EditComicForm({ comic, onSubmit, onDelete, onCancel }: EditComic
   const [deleting, setDeleting] = useState(false);
   const [coverBusy, setCoverBusy] = useState(false);
   const [retryingCover, setRetryingCover] = useState(false);
+  const [fetchingReadUrl, setFetchingReadUrl] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // detectTypes (title-based) dipakai, BUKAN backfillCovers (comic_id-based) —
@@ -59,6 +60,28 @@ export function EditComicForm({ comic, onSubmit, onDelete, onCancel }: EditComic
       setError(err instanceof Error ? err.message : "Gagal mengambil cover.");
     } finally {
       setRetryingCover(false);
+    }
+  };
+
+  // Beda dari handleRetryCover: comic_id-based (server cari pakai judul+chapter
+  // YANG TERSIMPAN di Astra, bukan state form saat ini) — cocok karena "chapter
+  // berikutnya" memang dihitung dari latest_chapter yang sudah tersimpan. Tombol
+  // ini selalu tampil (bukan hanya saat readUrl kosong) karena chapter
+  // berikutnya berubah tiap kali user update progres bacanya.
+  const handleFetchNextChapterUrl = async () => {
+    setError(null);
+    setFetchingReadUrl(true);
+    try {
+      const result = await fetchNextChapterReadUrl(comic.comic_id);
+      if (result.read_url) {
+        setReadUrl(result.read_url);
+      } else {
+        setError(result.reason ?? "Chapter berikutnya tidak ditemukan.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal mencari link chapter.");
+    } finally {
+      setFetchingReadUrl(false);
     }
   };
 
@@ -215,6 +238,21 @@ export function EditComicForm({ comic, onSubmit, onDelete, onCancel }: EditComic
             className="rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 focus:border-indigo-500 focus:outline-none"
           />
         </label>
+
+        <button
+          type="button"
+          onClick={handleFetchNextChapterUrl}
+          disabled={fetchingReadUrl || submitting}
+          className="self-start rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+        >
+          {fetchingReadUrl ? "Mencari chapter…" : "Cari link chapter berikutnya"}
+        </button>
+        <p className="text-xs text-slate-500">
+          <strong className="text-slate-400">Batasan fitur ini:</strong> hanya mencari di comick.dev
+          (bahasa Inggris), berdasarkan Chapter Terakhir Dibaca yang SUDAH TERSIMPAN (Simpan dulu kalau
+          baru saja mengubah angkanya). Untuk komik dengan katalog sangat panjang, chapter yang jauh dari
+          rilis terbaru mungkin tidak ketemu — isi manual kalau begitu.
+        </p>
 
         <label className="flex flex-col gap-1 text-sm text-slate-300">
           Hari Rilis (opsional)

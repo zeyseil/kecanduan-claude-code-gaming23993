@@ -156,6 +156,27 @@ export async function backfillCovers(comicIds: string[]): Promise<CoverBackfillR
   return body.results;
 }
 
+export interface FetchReadUrlResult {
+  read_url: string | null;
+  reason?: string;
+}
+
+/** "Cari link chapter berikutnya" — comick.dev lookup for the chapter right
+ * after this comic's stored latest_chapter. Never auto-saves; caller fills
+ * its own form state and the user still clicks Simpan. */
+export async function fetchNextChapterReadUrl(comicId: string): Promise<FetchReadUrlResult> {
+  const res = await apiFetch(`${BASE_URL}/comics/fetch-read-url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ comic_id: comicId }),
+  });
+  const body = (await res.json().catch(() => null)) as (FetchReadUrlResult & { error?: string }) | null;
+  if (!res.ok && !body?.reason) {
+    throw new Error(body?.error ?? `Request gagal (${res.status})`);
+  }
+  return body ?? { read_url: null, reason: "Request gagal" };
+}
+
 /** Auto-detect comic type from MangaDex for import lines that lack (jenis). */
 export async function detectTypes(titles: string[]): Promise<DetectTypeResultItem[]> {
   const res = await apiFetch(`${BASE_URL}/comics/detect-type`, {
