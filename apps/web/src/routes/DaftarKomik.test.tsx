@@ -294,4 +294,52 @@ describe("DaftarKomik", () => {
     );
     await waitFor(() => expect(screen.queryByText("Berserk")).not.toBeInTheDocument());
   });
+
+  it("bulk-delete >25 komik dipecah jadi beberapa request tanpa perlu pilih ulang", async () => {
+    const user = userEvent.setup();
+    const many: Comic[] = Array.from({ length: 30 }, (_, i) => ({
+      ...ONE_PIECE,
+      comic_id: `c${i}`,
+      title: `Komik ${i}`,
+      is_adult: false,
+    }));
+    fetchComicsMock.mockResolvedValue(many);
+    bulkDeleteComicsMock.mockImplementation(async (ids: string[]) =>
+      ids.map((id) => ({ comic_id: id, deleted: true })),
+    );
+    render(<DaftarKomik />);
+
+    await waitFor(() => expect(screen.getAllByText("Komik 0").length).toBeGreaterThan(0));
+
+    await user.click(screen.getByRole("button", { name: "Pilih" }));
+    await user.click(screen.getByRole("button", { name: "Pilih semua" }));
+    expect(screen.getByText("30 dipilih")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Hapus 30 komik" }));
+    await user.click(screen.getByRole("button", { name: "Ya, hapus 30 komik" }));
+
+    // 30 dipecah jadi 2 request (25 + 5).
+    await waitFor(() => expect(bulkDeleteComicsMock).toHaveBeenCalledTimes(2));
+    expect(bulkDeleteComicsMock.mock.calls[0][0]).toHaveLength(25);
+    expect(bulkDeleteComicsMock.mock.calls[1][0]).toHaveLength(5);
+    await waitFor(() =>
+      expect(screen.getByText("Tidak ada komik yang cocok.")).toBeInTheDocument(),
+    );
+  });
+
+  it("Mode Aman: default ON menyensor cover 18+, toggle OFF membukanya", async () => {
+    const user = userEvent.setup();
+    fetchComicsMock.mockResolvedValue([ONE_PIECE, BERSERK]);
+    render(<DaftarKomik />);
+
+    await waitFor(() => expect(screen.getAllByText("One Piece").length).toBeGreaterThan(0));
+
+    // Default ON → cover Berserk (is_adult) tersensor.
+    expect(screen.getAllByTestId("nsfw-overlay").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: /Mode Aman/ }));
+
+    // OFF → tidak ada sensor lagi.
+    expect(screen.queryByTestId("nsfw-overlay")).toBeNull();
+  });
 });

@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clearAuthToken, getAuthToken, getGoogleApiKey, setAuthToken, setGoogleApiKey } from "./storage";
+import {
+  clearAuthToken,
+  getAuthToken,
+  getGoogleApiKey,
+  getSafeMode,
+  setAuthToken,
+  setGoogleApiKey,
+  setSafeMode,
+} from "./storage";
 
 // jsdom's built-in localStorage is unreliable under some Node versions in
 // this environment, so we stub it ourselves (same pattern as fetch mocking
@@ -69,5 +77,30 @@ describe("auth token storage", () => {
     setAuthToken("my-token");
     clearAuthToken();
     expect(getAuthToken()).toBeNull();
+  });
+});
+
+describe("safe mode storage", () => {
+  beforeEach(() => {
+    vi.stubGlobal("localStorage", fakeLocalStorage());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("defaults to ON (true) when nothing stored", () => {
+    expect(getSafeMode()).toBe(true);
+  });
+
+  it("persists OFF and reads it back as false", () => {
+    setSafeMode(false);
+    expect(getSafeMode()).toBe(false);
+  });
+
+  it("persists ON again after being turned off", () => {
+    setSafeMode(false);
+    setSafeMode(true);
+    expect(getSafeMode()).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { parseHistoris, type FailedLine, type ParsedEntry } from "../lib/parseHistoris";
+import { chunk } from "../lib/chunk";
 import {
   backfillCovers,
   bulkImportComics,
@@ -12,19 +13,13 @@ import {
 // COVER/DETECT turun mengikuti batas Worker baru (MAX_COVER_BACKFILL/
 // MAX_DETECT_TITLES di routes/comics.ts) — tiap judul kini bisa memanggil
 // MangaDex DAN AniList.
+// COVER/DETECT diselaraskan dengan batas Worker (MAX_COVER_BACKFILL=4,
+// MAX_DETECT_TITLES=5) — tiap judul kini bisa memanggil hingga 4 sumber.
 const IMPORT_CHUNK_SIZE = 20;
-const COVER_CHUNK_SIZE = 6;
-const DETECT_CHUNK_SIZE = 8;
+const COVER_CHUNK_SIZE = 4;
+const DETECT_CHUNK_SIZE = 5;
 
 type Phase = "editing" | "preview" | "importing" | "done";
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    chunks.push(items.slice(i, i + size));
-  }
-  return chunks;
-}
 
 export function BulkImportPanel() {
   const [text, setText] = useState("");

@@ -20,10 +20,11 @@ const BULK_MATCH_THRESHOLD = 0.85;
 // sizes are capped well under that ceiling.
 const MAX_BULK_ENTRIES = 25;
 const MAX_BULK_DELETE = 25;
-// Each item can now hit BOTH MangaDex and AniList (2 throttle + 2 fetch
-// subrequests) plus Astra reads/writes, so caps sit lower than before.
-const MAX_COVER_BACKFILL = 6;
-const MAX_DETECT_TITLES = 8;
+// Each item can now hit up to FOUR sources (MangaDex, AniList, Comix, Komiku =
+// up to 4 throttle + 4 fetch subrequests) plus Astra reads/writes. Workers free
+// plan caps subrequests at 50/invocation, so caps sit lower than before.
+const MAX_COVER_BACKFILL = 4;
+const MAX_DETECT_TITLES = 5;
 
 /** Free-form user note. Bounded so a stray paste can't blow the Astra 8000-byte
  * indexed-field limit. */
@@ -339,7 +340,7 @@ comics.post("/backfill-covers", async (c) => {
     const info = await fetchComicInfo(comic.title, c.env);
     const coverUrl = info?.cover_url ?? null;
     if (coverUrl) {
-      await store.updateComic(userId, comicId, { cover_url: coverUrl });
+      await store.updateComic(userId, comicId, { cover_url: coverUrl, source_api: info?.source ?? null });
     }
     results.push({ comic_id: comicId, cover_url: coverUrl, reason: coverUrl ? undefined : "tidak ditemukan di MangaDex maupun AniList" });
   }

@@ -11,6 +11,10 @@ interface ComicGridProps {
   selectedIds?: Set<string>;
   onToggleSelect?: (comicId: string) => void;
   onToggleStatus?: (comic: Comic) => void;
+  /** Mode Aman aktif — cover 18+ disensor kecuali id-nya ada di revealedIds. */
+  safeMode?: boolean;
+  revealedIds?: Set<string>;
+  onReveal?: (comic: Comic) => void;
 }
 
 export function ComicGrid({
@@ -22,6 +26,9 @@ export function ComicGrid({
   selectedIds,
   onToggleSelect,
   onToggleStatus,
+  safeMode = false,
+  revealedIds,
+  onReveal,
 }: ComicGridProps) {
   if (comics.length === 0) {
     return (
@@ -55,6 +62,8 @@ export function ComicGrid({
             isSelected={selectMode && (selectedIds?.has(comic.comic_id) ?? false)}
             onToggleSelect={onToggleSelect}
             onToggleStatus={selectMode ? undefined : onToggleStatus}
+            blurred={safeMode && !(revealedIds?.has(comic.comic_id) ?? false)}
+            onReveal={onReveal}
           />
         ))}
       </div>

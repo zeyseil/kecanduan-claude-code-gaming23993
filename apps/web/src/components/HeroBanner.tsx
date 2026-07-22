@@ -12,16 +12,21 @@ const TYPE_LABEL: Record<Comic["type_tag"], string> = {
 interface HeroBannerProps {
   comics: Comic[];
   onEdit: (comic: Comic) => void;
+  /** Mode Aman aktif — sembunyikan cover latar kalau hero 18+ belum dibuka. */
+  safeMode?: boolean;
+  revealedIds?: Set<string>;
 }
 
-export function HeroBanner({ comics, onEdit }: HeroBannerProps) {
+export function HeroBanner({ comics, onEdit, safeMode = false, revealedIds }: HeroBannerProps) {
   const [latest] = selectRecent(comics, 1);
   if (!latest) return null;
+  const hideCover =
+    safeMode && latest.is_adult && !(revealedIds?.has(latest.comic_id) ?? false);
 
   return (
     <section className="relative mb-6 overflow-hidden rounded-xl border border-slate-800">
       <div className="absolute inset-0">
-        {latest.cover_url && (
+        {latest.cover_url && !hideCover && (
           <img
             src={latest.cover_url}
             alt=""
