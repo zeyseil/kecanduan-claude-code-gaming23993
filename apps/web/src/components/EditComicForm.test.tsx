@@ -7,13 +7,13 @@ import * as comicsApi from "../lib/api/comics";
 
 vi.mock("../lib/api/comics", async () => {
   const actual = await vi.importActual<typeof comicsApi>("../lib/api/comics");
-  return { ...actual, backfillCovers: vi.fn() };
+  return { ...actual, detectTypes: vi.fn() };
 });
 
-const backfillCoversMock = vi.mocked(comicsApi.backfillCovers);
+const detectTypesMock = vi.mocked(comicsApi.detectTypes);
 
 beforeEach(() => {
-  backfillCoversMock.mockReset();
+  detectTypesMock.mockReset();
 });
 
 const COMIC: Comic = {
@@ -126,15 +126,15 @@ describe("EditComicForm", () => {
   });
 
   it("mengisi cover dan menyembunyikan tombol setelah berhasil ambil cover", async () => {
-    backfillCoversMock.mockResolvedValue([
-      { comic_id: "1", cover_url: "https://example.com/cover.jpg" },
+    detectTypesMock.mockResolvedValue([
+      { title: "One Piece", type_tag: "manga", cover_url: "https://example.com/cover.jpg" },
     ]);
     const user = userEvent.setup();
     render(<EditComicForm comic={COMIC} onSubmit={vi.fn()} onDelete={vi.fn()} onCancel={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: /coba ambil cover otomatis/i }));
 
-    expect(backfillCoversMock).toHaveBeenCalledWith(["1"]);
+    expect(detectTypesMock).toHaveBeenCalledWith(["One Piece"]);
     expect(
       await screen.findByRole("img", { name: /cover/i }),
     ).toHaveAttribute("src", "https://example.com/cover.jpg");
@@ -143,9 +143,36 @@ describe("EditComicForm", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("mencari cover pakai judul yang baru diketik di field Nama, bukan judul tersimpan (belum tekan Simpan)", async () => {
+    detectTypesMock.mockResolvedValue([
+      { title: "Judul Baru", type_tag: "manga", cover_url: "https://example.com/baru.jpg" },
+    ]);
+    const user = userEvent.setup();
+    render(<EditComicForm comic={COMIC} onSubmit={vi.fn()} onDelete={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.clear(screen.getByLabelText("Nama"));
+    await user.type(screen.getByLabelText("Nama"), "Judul Baru");
+    await user.click(screen.getByRole("button", { name: /coba ambil cover otomatis/i }));
+
+    expect(detectTypesMock).toHaveBeenCalledWith(["Judul Baru"]);
+    expect(
+      await screen.findByRole("img", { name: /cover/i }),
+    ).toHaveAttribute("src", "https://example.com/baru.jpg");
+  });
+
+  it("menonaktifkan tombol coba ambil cover otomatis saat Nama kosong", async () => {
+    const user = userEvent.setup();
+    render(<EditComicForm comic={COMIC} onSubmit={vi.fn()} onDelete={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.clear(screen.getByLabelText("Nama"));
+
+    expect(screen.getByRole("button", { name: /coba ambil cover otomatis/i })).toBeDisabled();
+    expect(detectTypesMock).not.toHaveBeenCalled();
+  });
+
   it("menampilkan reason saat cover tidak ditemukan, tombol tetap tampil", async () => {
-    backfillCoversMock.mockResolvedValue([
-      { comic_id: "1", cover_url: null, reason: "tidak ditemukan di sumber manapun" },
+    detectTypesMock.mockResolvedValue([
+      { title: "One Piece", type_tag: null, cover_url: null, reason: "tidak ditemukan di sumber manapun" },
     ]);
     const user = userEvent.setup();
     render(<EditComicForm comic={COMIC} onSubmit={vi.fn()} onDelete={vi.fn()} onCancel={vi.fn()} />);
@@ -156,8 +183,34 @@ describe("EditComicForm", () => {
     expect(screen.getByRole("button", { name: /coba ambil cover otomatis/i })).toBeInTheDocument();
   });
 
-  it("menampilkan pesan error saat backfillCovers gagal (network/exception)", async () => {
-    backfillCoversMock.mockRejectedValue(new Error("Worker sedang down"));
+  it("menghapus cover yang ada lewat tombol Hapus cover, lalu tombol coba ambil otomatis muncul lagi", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <EditComicForm
+        comic={{ ...COMIC, cover_url: "https://example.com/cover.jpg" }}
+        onSubmit={onSubmit}
+        onDelete={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: /cover/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /coba ambil cover otomatis/i }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /hapus cover/i }));
+
+    expect(screen.queryByRole("img", { name: /cover/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /coba ambil cover otomatis/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Simpan" }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ cover_url: null }));
+  });
+
+  it("menampilkan pesan error saat detectTypes gagal (network/exception)", async () => {
+    detectTypesMock.mockRejectedValue(new Error("Worker sedang down"));
     const user = userEvent.setup();
     render(<EditComicForm comic={COMIC} onSubmit={vi.fn()} onDelete={vi.fn()} onCancel={vi.fn()} />);
 

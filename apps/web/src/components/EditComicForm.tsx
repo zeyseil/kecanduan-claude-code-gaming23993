@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { Comic, TypeTag } from "../types/comic";
 import { RELEASE_DAY_LABELS, TYPE_TAGS } from "../types/comic";
-import { backfillCovers, type ComicPatch } from "../lib/api/comics";
+import { detectTypes, type ComicPatch } from "../lib/api/comics";
 import { readFileAsDataUrl } from "../lib/cropImage";
 import { CoverDropzone } from "./CoverDropzone";
 import { ImageCropModal } from "./ImageCropModal";
@@ -39,11 +39,17 @@ export function EditComicForm({ comic, onSubmit, onDelete, onCancel }: EditComic
   const [retryingCover, setRetryingCover] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // detectTypes (title-based) dipakai, BUKAN backfillCovers (comic_id-based) —
+  // backfillCovers mencari pakai judul YANG TERSIMPAN di Astra, jadi kalau user
+  // baru saja mengetik judul baru di field Nama tapi belum tekan Simpan, itu
+  // akan tetap mencari pakai judul lama. detectTypes mencari pakai string judul
+  // apa adanya (state form saat ini), jadi ganti nama lalu langsung cari cover
+  // tanpa perlu simpan dulu.
   const handleRetryCover = async () => {
     setError(null);
     setRetryingCover(true);
     try {
-      const [result] = await backfillCovers([comic.comic_id]);
+      const [result] = await detectTypes([title.trim()]);
       if (result?.cover_url) {
         setCoverUrl(result.cover_url);
       } else {
@@ -242,6 +248,11 @@ export function EditComicForm({ comic, onSubmit, onDelete, onCancel }: EditComic
           ref={fileInputRef}
           value={coverUrl}
           onFileSelected={handleFileSelected}
+          onRemove={() => {
+            setCoverUrl(null);
+            // Reset supaya file yang sama bisa dipilih ulang setelah dihapus.
+            if (fileInputRef.current) fileInputRef.current.value = "";
+          }}
           busy={coverBusy}
           disabled={submitting}
         />
@@ -250,7 +261,7 @@ export function EditComicForm({ comic, onSubmit, onDelete, onCancel }: EditComic
           <button
             type="button"
             onClick={handleRetryCover}
-            disabled={retryingCover || submitting}
+            disabled={retryingCover || submitting || title.trim() === ""}
             className="rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
           >
             {retryingCover ? "Mencari cover…" : "Coba ambil cover otomatis"}

@@ -4,6 +4,9 @@ interface CoverDropzoneProps {
   /** Cover yang sudah dipilih (data URL) — ditampilkan sebagai preview. */
   value: string | null;
   onFileSelected: (file: File) => void | Promise<void>;
+  /** Kalau diberikan, tombol "Hapus cover" muncul saat `value` terisi.
+   * Dibiarkan undefined di AddComicForm (belum ada cover buat dihapus). */
+  onRemove?: () => void;
   /** Dikontrol parent: true selagi baca file / crop berjalan. */
   busy?: boolean;
   disabled?: boolean;
@@ -17,7 +20,7 @@ interface CoverDropzoneProps {
  * keyboard, dan screen reader tetap jalan tanpa handler tambahan.
  */
 export const CoverDropzone = forwardRef<HTMLInputElement, CoverDropzoneProps>(
-  function CoverDropzone({ value, onFileSelected, busy = false, disabled = false }, ref) {
+  function CoverDropzone({ value, onFileSelected, onRemove, busy = false, disabled = false }, ref) {
     const [isDragging, setIsDragging] = useState(false);
     const [rejected, setRejected] = useState(false);
     const labelId = useId();
@@ -130,6 +133,17 @@ export const CoverDropzone = forwardRef<HTMLInputElement, CoverDropzoneProps>(
             </div>
           )}
         </label>
+
+        {value && onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={disabled || busy}
+            className="self-start text-xs text-rose-400 hover:text-rose-300 disabled:opacity-50"
+          >
+            Hapus cover
+          </button>
+        )}
 
         {rejected && (
           <p className="text-xs text-rose-400">
