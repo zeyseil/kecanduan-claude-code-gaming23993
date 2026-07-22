@@ -9,6 +9,7 @@ import {
   getGeminiModel,
   setGeminiModel,
 } from "../lib/storage";
+import { handleExternalLinkClick } from "../lib/externalLink";
 
 type Status = "idle" | "processing" | "success" | "error";
 type Mode = "ai" | "import";
@@ -112,6 +113,7 @@ export function Tulis() {
                 href="https://aistudio.google.com/apikey"
                 target="_blank"
                 rel="noreferrer"
+                onClick={(e) => handleExternalLinkClick("https://aistudio.google.com/apikey", e)}
                 className="text-indigo-400 hover:underline"
               >
                 aistudio.google.com/apikey

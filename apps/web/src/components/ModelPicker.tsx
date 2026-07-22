@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchGeminiModels, type AgentModelOption } from "../lib/api/agent";
+import { handleExternalLinkClick } from "../lib/externalLink";
 
 const AI_STUDIO_RATE_LIMIT_URL = "https://aistudio.google.com/rate-limit";
 
@@ -113,6 +114,7 @@ export function ModelPicker({ value, onChange, apiKey }: ModelPickerProps) {
           href={AI_STUDIO_RATE_LIMIT_URL}
           target="_blank"
           rel="noreferrer"
+          onClick={(e) => handleExternalLinkClick(AI_STUDIO_RATE_LIMIT_URL, e)}
           className="text-indigo-400 hover:underline"
         >
           dashboard AI Studio

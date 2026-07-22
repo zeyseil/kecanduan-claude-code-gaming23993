@@ -5,13 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:tauri": "vite --mode tauri",
     "build": "tsc -b && vite build",
+    "build:tauri": "tsc -b && vite build --mode tauri",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint ."
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-shell": "^2.3.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-easy-crop": "^6.2.2",
