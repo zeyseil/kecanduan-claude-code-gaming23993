@@ -225,9 +225,10 @@ export function BulkImportPanel() {
                 yang diterima: titik, koma, atau tanda hubung (mis. <code>ch38-1</code> = 38.1).
               </li>
               <li>
-                Kalau <code>(jenis)</code> tidak ditulis, jenis bisa dideteksi otomatis dari MangaDex
-                (fallback AniList) — hanya untuk komik berbahasa asal Jepang/Korea/China yang terdaftar
-                di sana. Judul yang tidak cocok cukup meyakinkan tidak akan ditebak.
+                Kalau <code>(jenis)</code> tidak ditulis, jenis bisa dideteksi otomatis dari beberapa
+                sumber publik berurutan (MangaDex, comick.io, AniList, dan Komiku kalau dikonfigurasi
+                admin) — hanya untuk komik berbahasa asal Jepang/Korea/China yang terdaftar di salah
+                satu sumber itu. Judul yang tidak cocok cukup meyakinkan tidak akan ditebak.
               </li>
               <li>
                 Beberapa variasi dinormalisasi otomatis: pemisah <code>;</code>, chapter{" "}
