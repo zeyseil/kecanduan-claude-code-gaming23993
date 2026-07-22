@@ -240,6 +240,10 @@ const setCover: AgentTool = {
       properties: {
         comic_id: { type: "STRING", description: "comic_id hasil buat_entry_baru" },
         cover_url: { type: "STRING", description: "URL cover dari cari_cover_mangadex" },
+        source: {
+          type: "STRING",
+          description: "Nilai `source` dari hasil cari_cover_mangadex (mis. \"mangadex\"). Boleh dikosongkan.",
+        },
       },
       required: ["comic_id", "cover_url"],
     },
@@ -256,7 +260,10 @@ const setCover: AgentTool = {
       return { error: "comic tidak ditemukan" };
     }
 
-    await store.updateComic(ctx.userId, comicId, { cover_url: coverUrl });
+    await store.updateComic(ctx.userId, comicId, {
+      cover_url: coverUrl,
+      source_api: asString(args.source),
+    });
     return { comic_id: comicId, updated: true };
   },
 };

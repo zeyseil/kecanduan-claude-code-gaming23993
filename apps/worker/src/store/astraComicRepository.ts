@@ -13,6 +13,7 @@ function toComic(doc: Comic & { user_id: string; _id?: unknown }): Comic {
   comic.read_url = comic.read_url ?? null;
   comic.release_day = comic.release_day ?? null;
   comic.note = comic.note ?? null;
+  comic.source_api = comic.source_api ?? null;
   return comic;
 }
 

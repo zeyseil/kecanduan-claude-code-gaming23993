@@ -92,7 +92,14 @@ function coverUrlFor(entry: MangaDexMangaEntry): string | null {
 export async function fetchMangaDexInfo(title: string): Promise<MangaDexInfo | null> {
   // limit=10 (not 1): the correct result is often not ranked first, so we need
   // candidates to verify against.
-  const url = `https://api.mangadex.org/manga?title=${encodeURIComponent(title)}&limit=10&includes[]=cover_art`;
+  //
+  // contentRating[] is REQUIRED to see 18+ titles: MangaDex defaults to
+  // safe/suggestive/erotica and silently drops `pornographic`, so adult manhwa
+  // came back "not found" and their covers stayed empty. We request all four
+  // ratings — is_adult is a separate user-set field, not derived from this.
+  const contentRating =
+    "&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica&contentRating[]=pornographic";
+  const url = `https://api.mangadex.org/manga?title=${encodeURIComponent(title)}&limit=10&includes[]=cover_art${contentRating}`;
 
   const res = await fetch(url, {
     headers: {

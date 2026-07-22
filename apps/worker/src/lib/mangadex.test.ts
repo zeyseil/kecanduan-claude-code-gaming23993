@@ -119,4 +119,18 @@ describe("fetchMangaDexInfo", () => {
     stubMangaDex([]);
     expect(await fetchMangaDexInfo("Judul Antah Berantah")).toBeNull();
   });
+
+  it("requests all content ratings so 18+ titles aren't silently hidden", async () => {
+    let requestedUrl = "";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        requestedUrl = String(url);
+        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      }),
+    );
+    await fetchMangaDexInfo("Apapun");
+    expect(requestedUrl).toContain("contentRating[]=pornographic");
+    expect(requestedUrl).toContain("contentRating[]=erotica");
+  });
 });

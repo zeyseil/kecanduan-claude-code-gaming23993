@@ -69,3 +69,13 @@ export async function acquireMangaDexSlot(namespace: DurableObjectNamespace): Pr
 export async function acquireAniListSlot(namespace: DurableObjectNamespace): Promise<void> {
   await acquireSlot(namespace, "anilist", 3, 1);
 }
+
+/** Comix API — user self-hosted, so a moderate budget is fine (same as MangaDex). */
+export async function acquireComixSlot(namespace: DurableObjectNamespace): Promise<void> {
+  await acquireSlot(namespace, "comix", 5, 5);
+}
+
+/** Komiku — hosted on a third-party free Vercel instance; keep it gentle. */
+export async function acquireKomikuSlot(namespace: DurableObjectNamespace): Promise<void> {
+  await acquireSlot(namespace, "komiku", 2, 1);
+}

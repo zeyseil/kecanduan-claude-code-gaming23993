@@ -16,6 +16,8 @@ import {
 } from "../lib/api/comics";
 import type { Comic } from "../types/comic";
 import { downloadMarkdown } from "../lib/exportMarkdown";
+import { chunk } from "../lib/chunk";
+import { ProgressBar } from "../components/ProgressBar";
 import { Toolbar } from "../components/Toolbar";
 import { ComicGrid } from "../components/ComicGrid";
 import { RecentStrip } from "../components/RecentStrip";
@@ -24,6 +26,8 @@ import { AddComicForm } from "../components/AddComicForm";
 import { EditComicForm } from "../components/EditComicForm";
 import { SearchPalette } from "../components/SearchPalette";
 import { BulkDeleteConfirm } from "../components/BulkDeleteConfirm";
+import { NsfwRevealConfirm } from "../components/NsfwRevealConfirm";
+import { getSafeMode, setSafeMode } from "../lib/storage";
 import { HeroBanner } from "../components/HeroBanner";
 import { StatsPanel } from "../components/StatsPanel";
 import { ActivityPanel } from "../components/ActivityPanel";
@@ -34,6 +38,11 @@ import { takeReadingSession } from "../lib/readingSession";
 import { readComicCache, writeComicCache } from "../lib/comicCache";
 
 const RECENT_LIMIT = 8;
+// Server membatasi 25 comic per request bulk-delete (MAX_BULK_DELETE). Client
+// memecah pilihan sebesar apa pun jadi batch ini dan mengirim berurutan, dengan
+// jeda kecil antar-batch supaya tidak menabrak rate-limit per-user Worker.
+const BULK_DELETE_CHUNK = 25;
+const BULK_DELETE_GAP_MS = 150;
 
 type LoadStatus = "loading" | "ready" | "error";
 
@@ -53,7 +62,11 @@ export function DaftarKomik() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState<{ done: number; total: number } | null>(null);
   const [resumeComic, setResumeComic] = useState<Comic | null>(null);
+  const [safeMode, setSafeModeState] = useState(() => getSafeMode());
+  const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
+  const [revealComic, setRevealComic] = useState<Comic | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -182,16 +195,50 @@ export function DaftarKomik() {
     setSelectedIds(new Set(visible.map((c) => c.comic_id)));
   };
 
+  const handleToggleSafeMode = () => {
+    setSafeModeState((prev) => {
+      const next = !prev;
+      setSafeMode(next);
+      // Menyalakan lagi Mode Aman menutup ulang semua yang tadi dibuka.
+      if (next) setRevealedIds(new Set());
+      return next;
+    });
+  };
+
+  const handleRevealConfirm = () => {
+    if (!revealComic) return;
+    setRevealedIds((prev) => new Set(prev).add(revealComic.comic_id));
+    setRevealComic(null);
+  };
+
   const selectedComics = comics.filter((c) => selectedIds.has(c.comic_id));
 
   const handleBulkDelete = async () => {
     const ids = selectedComics.map((c) => c.comic_id);
-    const results = await bulkDeleteComics(ids);
-    const removed = new Set(results.filter((r) => r.deleted).map((r) => r.comic_id));
-    // Buang juga id yang server balas "sudah tidak ada" — tetap hilang dari grid.
-    for (const id of ids) removed.add(id);
-    setComics((prev) => prev.filter((c) => !removed.has(c.comic_id)));
-    exitSelectMode();
+    // Batch ≤25/request supaya pilihan sebesar apa pun tidak perlu diulang.
+    const batches = chunk(ids, BULK_DELETE_CHUNK);
+    const removed = new Set<string>();
+    setShowBulkConfirm(false);
+    setDeleteProgress({ done: 0, total: ids.length });
+    try {
+      for (const batch of batches) {
+        const results = await bulkDeleteComics(batch);
+        for (const r of results) if (r.deleted) removed.add(r.comic_id);
+        // Id yang server balas "sudah tidak ada" tetap dibuang dari grid.
+        for (const id of batch) removed.add(id);
+        setDeleteProgress((prev) => ({
+          total: ids.length,
+          done: (prev?.done ?? 0) + batch.length,
+        }));
+        if (batch !== batches[batches.length - 1]) {
+          await new Promise((resolve) => setTimeout(resolve, BULK_DELETE_GAP_MS));
+        }
+      }
+    } finally {
+      setComics((prev) => prev.filter((c) => !removed.has(c.comic_id)));
+      setDeleteProgress(null);
+      exitSelectMode();
+    }
   };
 
   return (
@@ -245,15 +292,24 @@ export function DaftarKomik() {
               canExport={comics.length > 0}
               onToggleSelect={selectMode ? exitSelectMode : enterSelectMode}
               selectMode={selectMode}
+              safeMode={safeMode}
+              onToggleSafeMode={handleToggleSafeMode}
             />
 
-            <HeroBanner comics={comics} onEdit={handleEditOpen} />
+            <HeroBanner
+              comics={comics}
+              onEdit={handleEditOpen}
+              safeMode={safeMode}
+              revealedIds={revealedIds}
+            />
 
             <div className="lg:hidden">
               <StatsPanel comics={comics} variant="compact" />
             </div>
 
-            {!isSearching && <RecentStrip comics={recent} />}
+            {!isSearching && (
+              <RecentStrip comics={recent} safeMode={safeMode} revealedIds={revealedIds} />
+            )}
 
             <SectionHeader title="Semua Komik" count={visible.length} />
             <ComicGrid
@@ -265,6 +321,9 @@ export function DaftarKomik() {
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
               onToggleStatus={handleToggleStatus}
+              safeMode={safeMode}
+              revealedIds={revealedIds}
+              onReveal={setRevealComic}
             />
           </div>
 
@@ -277,30 +336,36 @@ export function DaftarKomik() {
       )}
 
       {selectMode && (
-        <div className="sticky bottom-0 z-10 mt-4 flex flex-wrap items-center gap-2 border-t border-slate-700 bg-slate-900/95 px-2 py-3 backdrop-blur">
-          <span className="text-sm text-slate-300">{selectedIds.size} dipilih</span>
-          <button
-            type="button"
-            onClick={handleSelectAll}
-            className="rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
-          >
-            Pilih semua
-          </button>
-          <button
-            type="button"
-            onClick={exitSelectMode}
-            className="rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
-          >
-            Batal
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowBulkConfirm(true)}
-            disabled={selectedIds.size === 0}
-            className="ml-auto rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-50"
-          >
-            Hapus {selectedIds.size} komik
-          </button>
+        <div className="sticky bottom-0 z-10 mt-4 flex flex-col gap-2 border-t border-slate-700 bg-slate-900/95 px-2 py-3 backdrop-blur">
+          {deleteProgress ? (
+            <ProgressBar done={deleteProgress.done} total={deleteProgress.total} label="Menghapus komik" />
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-slate-300">{selectedIds.size} dipilih</span>
+              <button
+                type="button"
+                onClick={handleSelectAll}
+                className="rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+              >
+                Pilih semua
+              </button>
+              <button
+                type="button"
+                onClick={exitSelectMode}
+                className="rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowBulkConfirm(true)}
+                disabled={selectedIds.size === 0}
+                className="ml-auto rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-50"
+              >
+                Hapus {selectedIds.size} komik
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -309,6 +374,14 @@ export function DaftarKomik() {
           comic={resumeComic}
           onUpdate={handleResumeUpdate}
           onDismiss={() => setResumeComic(null)}
+        />
+      )}
+
+      {revealComic && (
+        <NsfwRevealConfirm
+          comic={revealComic}
+          onConfirm={handleRevealConfirm}
+          onCancel={() => setRevealComic(null)}
         />
       )}
 
