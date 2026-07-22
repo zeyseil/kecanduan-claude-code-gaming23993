@@ -49,7 +49,7 @@ export function selectRecent(comics: Comic[], limit: number): Comic[] {
 }
 
 /** Jumlah card per halaman grid — di bawah 40 supaya scroll tidak terlalu panjang. */
-export const PAGE_SIZE = 36;
+export const PAGE_SIZE = 35;
 
 export interface PaginateResult {
   items: Comic[];
