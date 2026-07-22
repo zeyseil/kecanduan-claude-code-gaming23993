@@ -6,7 +6,7 @@ const { isTauriMock, openMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: isTauriMock }));
-vi.mock("@tauri-apps/plugin-shell", () => ({ open: openMock }));
+vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: openMock }));
 
 import { handleExternalLinkClick } from "./externalLink";
 
