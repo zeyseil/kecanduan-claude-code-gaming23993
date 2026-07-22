@@ -57,7 +57,7 @@ export function Tulis() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className={`mx-auto ${mode === "import" ? "max-w-7xl" : "max-w-3xl"}`}>
       <h1 className="mb-1 text-lg font-semibold text-slate-100">Tulis</h1>
       <p className="mb-4 text-sm text-slate-400">
         Catat bacaan baru atau update chapter, atau impor data historis sekali jalan.

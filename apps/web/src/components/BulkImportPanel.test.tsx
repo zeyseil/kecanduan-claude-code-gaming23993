@@ -13,10 +13,29 @@ const bulkImportComicsMock = vi.mocked(comicsApi.bulkImportComics);
 const backfillCoversMock = vi.mocked(comicsApi.backfillCovers);
 const detectTypesMock = vi.mocked(comicsApi.detectTypes);
 
+function fakeLocalStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      store.set(key, value);
+    },
+    removeItem: (key: string) => {
+      store.delete(key);
+    },
+    clear: () => store.clear(),
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
+    get length() {
+      return store.size;
+    },
+  } as Storage;
+}
+
 beforeEach(() => {
   bulkImportComicsMock.mockReset();
   backfillCoversMock.mockReset();
   detectTypesMock.mockReset();
+  vi.stubGlobal("localStorage", fakeLocalStorage());
 });
 
 afterEach(() => {
@@ -32,7 +51,7 @@ describe("BulkImportPanel", () => {
       screen.getByLabelText(/teks data historis/i),
       "Judul benar(manga):ch1\nbaris sampah",
     );
-    await user.click(screen.getByRole("button", { name: /preview/i }));
+    await user.click(screen.getByRole("button", { name: /import data/i }));
 
     expect(
       await screen.findByText(/1 siap import, 0 perlu deteksi jenis, 1 baris gagal/i),
@@ -48,7 +67,7 @@ describe("BulkImportPanel", () => {
     render(<BulkImportPanel />);
 
     await user.type(screen.getByLabelText(/teks data historis/i), "Judul benar(manga):ch1");
-    await user.click(screen.getByRole("button", { name: /preview/i }));
+    await user.click(screen.getByRole("button", { name: /import data/i }));
     await user.click(screen.getByRole("button", { name: /import 1 entri/i }));
 
     expect(await screen.findByText(/1 dibuat, 0 diupdate, 0 dilewati, 0 gagal/i)).toBeInTheDocument();
@@ -66,7 +85,7 @@ describe("BulkImportPanel", () => {
     render(<BulkImportPanel />);
 
     await user.type(screen.getByLabelText(/teks data historis/i), "Judul benar(manga):ch1");
-    await user.click(screen.getByRole("button", { name: /preview/i }));
+    await user.click(screen.getByRole("button", { name: /import data/i }));
     await user.click(screen.getByRole("button", { name: /import 1 entri/i }));
 
     const coverButton = await screen.findByRole("button", { name: /ambil cover/i });
@@ -84,7 +103,7 @@ describe("BulkImportPanel", () => {
     render(<BulkImportPanel />);
 
     await user.type(screen.getByLabelText(/teks data historis/i), "Judul benar(manga):ch1");
-    await user.click(screen.getByRole("button", { name: /preview/i }));
+    await user.click(screen.getByRole("button", { name: /import data/i }));
     await user.click(screen.getByRole("button", { name: /import 1 entri/i }));
 
     expect(await screen.findByText(/0 dibuat, 0 diupdate, 1 dilewati, 0 gagal/i)).toBeInTheDocument();
@@ -97,10 +116,11 @@ describe("BulkImportPanel", () => {
     render(<BulkImportPanel />);
 
     await user.type(screen.getByLabelText(/teks data historis/i), "Judul benar(manga):ch1");
-    await user.click(screen.getByRole("button", { name: /preview/i }));
+    await user.click(screen.getByRole("button", { name: /import data/i }));
     await user.click(screen.getByRole("button", { name: /import 1 entri/i }));
 
-    expect(await screen.findByText(/worker sedang down/i)).toBeInTheDocument();
+    // Muncul dua kali: panel error di kolom kanan DAN entri baru di kartu Riwayat Impor.
+    expect(await screen.findAllByText(/worker sedang down/i)).toHaveLength(2);
   });
 
   it("baris tanpa (jenis) masuk 'perlu deteksi', dan tombol import hanya menghitung yang siap", async () => {
@@ -111,7 +131,7 @@ describe("BulkImportPanel", () => {
       screen.getByLabelText(/teks data historis/i),
       "Judul lengkap(manga):ch1\nJudul tanpa jenis:ch5",
     );
-    await user.click(screen.getByRole("button", { name: /preview/i }));
+    await user.click(screen.getByRole("button", { name: /import data/i }));
 
     expect(
       await screen.findByText(/1 siap import, 1 perlu deteksi jenis, 0 baris gagal/i),
@@ -129,7 +149,7 @@ describe("BulkImportPanel", () => {
     render(<BulkImportPanel />);
 
     await user.type(screen.getByLabelText(/teks data historis/i), "Solo Leveling:ch179");
-    await user.click(screen.getByRole("button", { name: /preview/i }));
+    await user.click(screen.getByRole("button", { name: /import data/i }));
     await user.click(screen.getByRole("button", { name: /deteksi jenis otomatis/i }));
 
     // Setelah deteksi, entri jadi siap import (1 siap, 0 perlu deteksi).
@@ -164,7 +184,7 @@ describe("BulkImportPanel", () => {
     render(<BulkImportPanel />);
 
     await user.type(screen.getByLabelText(/teks data historis/i), "Solo Leveling:ch179");
-    await user.click(screen.getByRole("button", { name: /preview/i }));
+    await user.click(screen.getByRole("button", { name: /import data/i }));
     await user.click(screen.getByRole("button", { name: /deteksi jenis otomatis/i }));
     await screen.findByText(/1 siap import, 0 perlu deteksi jenis/i);
     await user.click(screen.getByRole("button", { name: /import 1 entri/i }));
@@ -196,11 +216,75 @@ describe("BulkImportPanel", () => {
     render(<BulkImportPanel />);
 
     await user.type(screen.getByLabelText(/teks data historis/i), "Judul Antah Berantah:ch1");
-    await user.click(screen.getByRole("button", { name: /preview/i }));
+    await user.click(screen.getByRole("button", { name: /import data/i }));
     await user.click(screen.getByRole("button", { name: /deteksi jenis otomatis/i }));
 
     // Masih 0 siap import — tidak ada tebakan yang tersimpan.
     expect(await screen.findByText(/0 siap import/i)).toBeInTheDocument();
     expect(screen.getByText(/jenis tidak terdeteksi/i)).toBeInTheDocument();
+  });
+
+  it("tombol Default (RAW) mengisi textarea dengan contoh", async () => {
+    const user = userEvent.setup();
+    render(<BulkImportPanel />);
+
+    await user.click(screen.getByRole("button", { name: /default \(raw\)/i }));
+
+    expect(screen.getByLabelText(/teks data historis/i)).toHaveValue(
+      "162. Judul komik(manga) : ch11\n172.Judul lain(2022)(manhwa):ch32",
+    );
+  });
+
+  it("Hapus Baris Kosong membuang baris kosong dari textarea", async () => {
+    const user = userEvent.setup();
+    render(<BulkImportPanel />);
+
+    const textarea = screen.getByLabelText(/teks data historis/i);
+    await user.type(textarea, "Judul benar(manga):ch1{Enter}{Enter}Judul lain(manga):ch2");
+    await user.click(screen.getByRole("button", { name: /hapus baris kosong/i }));
+
+    expect(textarea).toHaveValue("Judul benar(manga):ch1\nJudul lain(manga):ch2");
+  });
+
+  it("Validasi Format menampilkan ringkasan tanpa memicu deteksi/import", async () => {
+    const user = userEvent.setup();
+    render(<BulkImportPanel />);
+
+    await user.type(
+      screen.getByLabelText(/teks data historis/i),
+      "Judul benar(manga):ch1\nbaris sampah",
+    );
+    await user.click(screen.getByRole("button", { name: /validasi format/i }));
+
+    expect(await screen.findByText(/1 valid, 1 gagal/i)).toBeInTheDocument();
+    // Masih di fase editing (bukan preview) — textarea tetap bisa diedit.
+    expect(screen.getByLabelText(/teks data historis/i)).toBeInTheDocument();
+    expect(bulkImportComicsMock).not.toHaveBeenCalled();
+  });
+
+  it("mencatat riwayat sukses setelah import selesai", async () => {
+    bulkImportComicsMock.mockResolvedValue([
+      { title: "Judul benar", action: "created", comic_id: "c-1" },
+    ]);
+    const user = userEvent.setup();
+    render(<BulkImportPanel />);
+
+    await user.type(screen.getByLabelText(/teks data historis/i), "Judul benar(manga):ch1");
+    await user.click(screen.getByRole("button", { name: /import data/i }));
+    await user.click(screen.getByRole("button", { name: /import 1 entri/i }));
+
+    await screen.findByText(/1 dibuat, 0 diupdate, 0 dilewati, 0 gagal/i);
+    // Muncul dua kali: ringkasan fase "done" DAN entri baru di kartu Riwayat Impor.
+    expect(await screen.findAllByText(/1 dibuat, 0 diupdate/i)).toHaveLength(2);
+  });
+
+  it("mencatat riwayat gagal saat ada baris parsing error", async () => {
+    const user = userEvent.setup();
+    render(<BulkImportPanel />);
+
+    await user.type(screen.getByLabelText(/teks data historis/i), "baris sampah");
+    await user.click(screen.getByRole("button", { name: /import data/i }));
+
+    expect(await screen.findByText(/parsing error baris 1/i)).toBeInTheDocument();
   });
 });
