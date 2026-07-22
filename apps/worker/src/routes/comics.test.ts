@@ -545,15 +545,69 @@ describe("/comics", () => {
         }),
       });
       expect(res.status).toBe(200);
-      const body = (await res.json()) as { results: Array<{ title: string; action: string }> };
+      const body = (await res.json()) as {
+        results: Array<{ title: string; action: string; cover_url?: string | null }>;
+      };
       expect(body.results).toEqual([
-        { title: "One Piece", action: "created", comic_id: expect.any(String) },
-        { title: "Berserk", action: "created", comic_id: expect.any(String) },
+        { title: "One Piece", action: "created", comic_id: expect.any(String), cover_url: null },
+        { title: "Berserk", action: "created", comic_id: expect.any(String), cover_url: null },
       ]);
 
       const listRes = await request("/comics");
       const list = (await listRes.json()) as Comic[];
       expect(list).toHaveLength(2);
+    });
+
+    it("uses cover_url/source_api carried from /detect-type when creating, skipping a redundant fetch", async () => {
+      const res = await request("/comics/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: [
+            {
+              title: "One Piece",
+              type_tag: "manga",
+              is_adult: false,
+              latest_chapter: 1,
+              status: "ongoing",
+              cover_url: "https://cdn/one-piece.jpg",
+              source_api: "mangadex",
+            },
+          ],
+        }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        results: Array<{ title: string; action: string; comic_id?: string; cover_url?: string | null }>;
+      };
+      expect(body.results[0]).toEqual({
+        title: "One Piece",
+        action: "created",
+        comic_id: expect.any(String),
+        cover_url: "https://cdn/one-piece.jpg",
+      });
+
+      const listRes = await request("/comics");
+      const list = (await listRes.json()) as Array<{ title: string; cover_url: string | null; source_api?: string | null }>;
+      const created = list.find((c) => c.title === "One Piece")!;
+      expect(created.cover_url).toBe("https://cdn/one-piece.jpg");
+      expect(created.source_api).toBe("mangadex");
+    });
+
+    it("rejects a non-string cover_url on a bulk entry", async () => {
+      const res = await request("/comics/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: [
+            { title: "One Piece", type_tag: "manga", is_adult: false, latest_chapter: 1, status: "ongoing", cover_url: 123 },
+          ],
+        }),
+      });
+      expect(res.status).toBe(200);
+      const body2 = (await res.json()) as { results: Array<{ action: string; reason?: string }> };
+      expect(body2.results[0].action).toBe("error");
+      expect(body2.results[0].reason).toMatch(/cover_url/);
     });
 
     it("updates an existing comic when the imported chapter is higher (upsert, not duplicate)", async () => {
@@ -797,8 +851,14 @@ describe("/comics", () => {
         body: JSON.stringify({ titles: ["Solo Leveling"] }),
       });
       expect(res.status).toBe(200);
-      const body = (await res.json()) as { results: Array<{ title: string; type_tag: string | null }> };
-      expect(body.results).toEqual([{ title: "Solo Leveling", type_tag: "manhwa" }]);
+      const body = (await res.json()) as {
+        results: Array<{ title: string; type_tag: string | null; cover_url?: string | null; source_api?: string | null }>;
+      };
+      // No cover_art relationship in the fixture, so cover_url is null — the
+      // route still surfaces it (and source_api) alongside a resolved type_tag.
+      expect(body.results).toEqual([
+        { title: "Solo Leveling", type_tag: "manhwa", cover_url: null, source_api: "mangadex" },
+      ]);
 
       vi.unstubAllGlobals();
     });

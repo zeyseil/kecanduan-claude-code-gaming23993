@@ -6,6 +6,7 @@ import {
   bulkImportComics,
   detectTypes,
   type BulkImportResultItem,
+  type DetectTypeResultItem,
 } from "../lib/api/comics";
 
 // Cloudflare Workers cap subrequests per invocation, so entries/covers/detections
@@ -55,10 +56,10 @@ export function BulkImportPanel() {
     setDetectProgress({ done: 0, total: titles.length });
 
     try {
-      const detected = new Map<string, string | null>();
+      const detected = new Map<string, DetectTypeResultItem>();
       for (const c of chunk(titles, DETECT_CHUNK_SIZE)) {
         const results = await detectTypes(c);
-        for (const r of results) detected.set(r.title, r.type_tag);
+        for (const r of results) detected.set(r.title, r);
         setDetectProgress((prev) => ({ ...(prev ?? { done: 0, total: titles.length }), done: (prev?.done ?? 0) + c.length }));
       }
 
@@ -66,8 +67,17 @@ export function BulkImportPanel() {
       setEntries((prev) =>
         prev.map((e) => {
           if (e.type_tag !== null) return e;
-          const type = detected.get(e.title);
-          if (type) return { ...e, type_tag: type as ParsedEntry["type_tag"] };
+          const result = detected.get(e.title);
+          if (result?.type_tag) {
+            // Carry over the cover detect-type already found (if any) — skips
+            // a redundant re-fetch in "Ambil cover" for this entry.
+            return {
+              ...e,
+              type_tag: result.type_tag,
+              cover_url: result.cover_url ?? null,
+              source_api: result.source_api ?? null,
+            };
+          }
           failures.push({ title: e.title, reason: "jenis tidak terdeteksi di MangaDex/AniList — tulis (jenis) manual" });
           return e;
         }),
@@ -104,10 +114,16 @@ export function BulkImportPanel() {
     }
   };
 
+  // Entries created without a cover — detect-type may have already found one
+  // (carried through /bulk's response as cover_url), in which case there's
+  // nothing left to fetch for that entry.
+  const needsCoverBackfill = useMemo(
+    () => importResults.filter((r) => r.action === "created" && r.comic_id && !r.cover_url),
+    [importResults],
+  );
+
   const handleBackfillCovers = async () => {
-    const createdIds = importResults
-      .filter((r) => r.action === "created" && r.comic_id)
-      .map((r) => r.comic_id!);
+    const createdIds = needsCoverBackfill.map((r) => r.comic_id!);
     if (createdIds.length === 0) return;
 
     setErrorMsg(null);
@@ -179,6 +195,12 @@ export function BulkImportPanel() {
             (mis. <code>(manhwa18)</code>).
           </li>
           <li>Judul yang sudah ada akan diupdate chapternya (kalau lebih tinggi), bukan diduplikasi.</li>
+          <li>
+            Kalau deteksi jenis otomatis dijalankan (baris tanpa <code>(jenis)</code>), cover-nya
+            ikut terambil sekaligus untuk baris itu — tombol "Ambil cover" setelah import hanya
+            muncul untuk komik yang cover-nya belum ketemu (mis. jenis ditulis manual, atau
+            deteksi tidak dijalankan).
+          </li>
         </ul>
       </div>
 
@@ -285,14 +307,19 @@ export function BulkImportPanel() {
             Selesai: {summary.created} dibuat, {summary.updated} diupdate, {summary.skipped} dilewati,{" "}
             {summary.error} gagal.
           </p>
-          {summary.created > 0 && !coverDone && (
+          {summary.created > 0 && needsCoverBackfill.length === 0 && !coverDone && (
+            <p className="mt-2 text-sm text-emerald-400">
+              Semua {summary.created} komik baru sudah dapat cover otomatis saat deteksi jenis.
+            </p>
+          )}
+          {needsCoverBackfill.length > 0 && !coverDone && (
             <button
               type="button"
               onClick={handleBackfillCovers}
               disabled={coverProgress !== null}
               className="mt-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
             >
-              Ambil cover ({summary.created} komik baru)
+              Ambil cover ({needsCoverBackfill.length} komik)
             </button>
           )}
           {coverProgress !== null && !coverDone && (

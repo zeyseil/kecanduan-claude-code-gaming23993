@@ -6,6 +6,10 @@ export interface DetectTypeResultItem {
   title: string;
   type_tag: TypeTag | null;
   reason?: string;
+  /** Set only alongside a resolved type_tag — the same fetchComicInfo() call
+   * that found the type already found (or didn't find) a cover. */
+  cover_url?: string | null;
+  source_api?: string | null;
 }
 
 const BASE_URL = import.meta.env.VITE_WORKER_URL ?? "http://localhost:8787";
@@ -95,6 +99,9 @@ export interface BulkImportResultItem {
   action: "created" | "updated" | "skipped" | "error";
   comic_id?: string;
   reason?: string;
+  /** Present (possibly null) only for "created" — lets the client skip
+   * backfill-covers for entries that already got a cover from detect-type. */
+  cover_url?: string | null;
 }
 
 /** Deterministic import from parsed historical data — no AI involved. */

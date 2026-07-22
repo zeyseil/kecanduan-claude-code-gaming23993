@@ -21,6 +21,11 @@ export interface ParsedEntry {
   /** Catatan bebas dari data asli (mis. "hiatus", "S1 end", "short") — informasi
    * yang bukan status/jenis valid tapi sayang dibuang. null kalau tidak ada. */
   note: string | null;
+  /** Diisi BulkImportPanel setelah deteksi jenis otomatis menemukan cover
+   * sekalian — bukan dari parser. undefined = belum ada info (parser tidak
+   * pernah mengisi ini sendiri). */
+  cover_url?: string | null;
+  source_api?: string | null;
 }
 
 export interface FailedLine {
