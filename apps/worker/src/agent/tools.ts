@@ -210,7 +210,7 @@ const cariCoverMangadex: AgentTool = {
   declaration: {
     name: "cari_cover_mangadex",
     description:
-      "Cari cover komik dari MangaDex (fallback otomatis ke AniList). Hanya MENCARI URL-nya, TIDAK menyimpan — panggil set_cover setelahnya kalau hasilnya tidak null.",
+      "Cari cover komik dari beberapa sumber publik berurutan (MangaDex, comick.io, AniList, Komiku kalau dikonfigurasi). Hanya MENCARI URL-nya, TIDAK menyimpan — panggil set_cover setelahnya kalau hasilnya tidak null.",
     parameters: {
       type: "OBJECT",
       properties: {

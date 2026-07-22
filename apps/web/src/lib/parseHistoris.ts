@@ -12,7 +12,7 @@ import { STATUSES, TYPE_TAGS } from "../types/comic";
 
 export interface ParsedEntry {
   title: string;
-  /** null artinya "jenis tidak ditulis user" — perlu deteksi otomatis via MangaDex/AniList. */
+  /** null artinya "jenis tidak ditulis user" — perlu deteksi otomatis via MangaDex/comick/AniList/Komiku. */
   type_tag: TypeTag | null;
   /** Field terpisah dari type_tag — JANGAN digabung (SPEC.md §8, bug aplikasi lama). */
   is_adult: boolean;
