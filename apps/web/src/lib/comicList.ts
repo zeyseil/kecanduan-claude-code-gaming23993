@@ -48,6 +48,26 @@ export function selectRecent(comics: Comic[], limit: number): Comic[] {
   return comics.slice().sort(sortByRecent).slice(0, limit);
 }
 
+/** Jumlah card per halaman grid — di bawah 40 supaya scroll tidak terlalu panjang. */
+export const PAGE_SIZE = 36;
+
+export interface PaginateResult {
+  items: Comic[];
+  totalPages: number;
+}
+
+/**
+ * Potong `comics` (yang sudah difilter+diurutkan) jadi satu halaman.
+ * `page` di luar rentang (mis. setelah filter mempersempit hasil) di-clamp
+ * ke halaman terakhir yang valid, bukan mengembalikan array kosong.
+ */
+export function paginate(comics: Comic[], page: number): PaginateResult {
+  const totalPages = Math.max(1, Math.ceil(comics.length / PAGE_SIZE));
+  const clampedPage = Math.min(Math.max(page, 0), totalPages - 1);
+  const start = clampedPage * PAGE_SIZE;
+  return { items: comics.slice(start, start + PAGE_SIZE), totalPages };
+}
+
 /**
  * Terapkan search + filter + sort secara murni (tidak memutasi input).
  * Dipakai halaman Daftar Komik lewat useMemo.

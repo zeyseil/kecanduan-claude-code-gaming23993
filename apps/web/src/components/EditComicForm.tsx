@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { Comic, TypeTag } from "../types/comic";
 import { RELEASE_DAY_LABELS, TYPE_TAGS } from "../types/comic";
-import type { ComicPatch } from "../lib/api/comics";
+import { backfillCovers, type ComicPatch } from "../lib/api/comics";
 import { readFileAsDataUrl } from "../lib/cropImage";
 import { CoverDropzone } from "./CoverDropzone";
 import { ImageCropModal } from "./ImageCropModal";
@@ -36,7 +36,25 @@ export function EditComicForm({ comic, onSubmit, onDelete, onCancel }: EditComic
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [coverBusy, setCoverBusy] = useState(false);
+  const [retryingCover, setRetryingCover] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleRetryCover = async () => {
+    setError(null);
+    setRetryingCover(true);
+    try {
+      const [result] = await backfillCovers([comic.comic_id]);
+      if (result?.cover_url) {
+        setCoverUrl(result.cover_url);
+      } else {
+        setError(result?.reason ?? "Cover tidak ditemukan dari sumber manapun.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal mengambil cover.");
+    } finally {
+      setRetryingCover(false);
+    }
+  };
 
   const handleFileSelected = async (file: File) => {
     setCoverBusy(true);
@@ -227,6 +245,17 @@ export function EditComicForm({ comic, onSubmit, onDelete, onCancel }: EditComic
           busy={coverBusy}
           disabled={submitting}
         />
+
+        {!coverUrl && (
+          <button
+            type="button"
+            onClick={handleRetryCover}
+            disabled={retryingCover || submitting}
+            className="rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+          >
+            {retryingCover ? "Mencari cover…" : "Coba ambil cover otomatis"}
+          </button>
+        )}
 
         <div className="flex items-center justify-between gap-2 pt-2">
           <button

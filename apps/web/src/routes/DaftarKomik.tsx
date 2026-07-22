@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   selectComics,
   selectRecent,
+  paginate,
   DEFAULT_OPTIONS,
   type ComicListOptions,
 } from "../lib/comicList";
@@ -33,6 +34,7 @@ import { StatsPanel } from "../components/StatsPanel";
 import { ActivityPanel } from "../components/ActivityPanel";
 import { ReleaseSchedule } from "../components/ReleaseSchedule";
 import { SkeletonGrid, SkeletonHero, SkeletonPanel } from "../components/Skeletons";
+import { Pagination } from "../components/Pagination";
 import { ContinueReadingPrompt } from "../components/ContinueReadingPrompt";
 import { takeReadingSession } from "../lib/readingSession";
 import { readComicCache, writeComicCache } from "../lib/comicCache";
@@ -55,6 +57,7 @@ export function DaftarKomik() {
   );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [options, setOptions] = useState<ComicListOptions>(DEFAULT_OPTIONS);
+  const [page, setPage] = useState(0);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingComic, setEditingComic] = useState<Comic | null>(null);
   const [pressedComicId, setPressedComicId] = useState<string | null>(null);
@@ -126,6 +129,14 @@ export function DaftarKomik() {
   const visible = useMemo(() => selectComics(comics, options), [comics, options]);
   const recent = useMemo(() => selectRecent(comics, RECENT_LIMIT), [comics]);
   const isSearching = options.search.trim() !== "";
+
+  // Filter/search/sort baru bisa mempersempit hasil di bawah halaman saat ini —
+  // kembali ke halaman 1 supaya tidak menampilkan grid kosong.
+  useEffect(() => {
+    setPage(0);
+  }, [options]);
+
+  const { items: pageItems, totalPages } = useMemo(() => paginate(visible, page), [visible, page]);
 
   const handleAdd = async (input: NewComicInput) => {
     const created = await postComic(input);
@@ -313,7 +324,7 @@ export function DaftarKomik() {
 
             <SectionHeader title="Semua Komik" count={visible.length} />
             <ComicGrid
-              comics={visible}
+              comics={pageItems}
               pressedComicId={pressedComicId}
               onPress={handlePress}
               onEdit={handleEditOpen}
@@ -325,6 +336,7 @@ export function DaftarKomik() {
               revealedIds={revealedIds}
               onReveal={setRevealComic}
             />
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
           </div>
 
           <aside className="hidden lg:flex lg:flex-col lg:gap-4">

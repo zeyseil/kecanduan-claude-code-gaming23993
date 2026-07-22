@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { selectComics, selectRecent, DEFAULT_OPTIONS } from "./comicList";
+import { selectComics, selectRecent, paginate, PAGE_SIZE, DEFAULT_OPTIONS } from "./comicList";
 import type { Comic } from "../types/comic";
 
 function comic(overrides: Partial<Comic>): Comic {
@@ -135,5 +135,40 @@ describe("selectRecent", () => {
   it("mengembalikan seluruhnya kalau limit melebihi panjang array", () => {
     const result = selectRecent(sample, 10);
     expect(result).toHaveLength(3);
+  });
+});
+
+describe("paginate", () => {
+  const many: Comic[] = Array.from({ length: 90 }, (_, i) =>
+    comic({ comic_id: `c${i}`, title: `Komik ${i}` }),
+  );
+
+  it("memotong sesuai PAGE_SIZE untuk halaman pertama", () => {
+    const result = paginate(many, 0);
+    expect(result.items).toHaveLength(PAGE_SIZE);
+    expect(result.items[0].comic_id).toBe("c0");
+    expect(result.totalPages).toBe(3);
+  });
+
+  it("halaman terakhir bisa parsial", () => {
+    const result = paginate(many, 2);
+    expect(result.items).toHaveLength(90 - PAGE_SIZE * 2);
+  });
+
+  it("mengembalikan semua di satu halaman kalau di bawah PAGE_SIZE", () => {
+    const result = paginate(sample, 0);
+    expect(result.items).toHaveLength(3);
+    expect(result.totalPages).toBe(1);
+  });
+
+  it("meng-clamp halaman di luar rentang ke halaman terakhir yang valid", () => {
+    const result = paginate(many, 99);
+    expect(result.items).toHaveLength(90 - PAGE_SIZE * 2);
+  });
+
+  it("tidak memutasi array input", () => {
+    const copy = [...many];
+    paginate(many, 1);
+    expect(many).toEqual(copy);
   });
 });
