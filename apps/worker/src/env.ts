@@ -17,6 +17,13 @@ export interface Env {
   /** Base URL instance Komiku REST API (VernSG). Kosong = pakai default publik
    * di lib/komiku.ts. */
   KOMIKU_API_URL?: string;
+  /** (Opsional) Override base URL API Shinigami. Kosong = default
+   * https://api.shngm.io (lihat lib/shinigami.ts). Escape-hatch kalau Shinigami
+   * pindah domain mirror (g/d/dev.shinigami.asia). */
+  SHINIGAMI_API_URL?: string;
+  /** (Opsional) Override base URL frontend Shinigami untuk membangun link baca
+   * chapter. Kosong = default https://g.shinigami.asia. */
+  SHINIGAMI_READER_URL?: string;
   RATE_LIMITER: DurableObjectNamespace;
   USER_RATE_LIMITER: DurableObjectNamespace;
   AUTH_TOKENS: KVNamespace;
