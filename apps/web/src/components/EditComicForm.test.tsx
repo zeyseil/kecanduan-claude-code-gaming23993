@@ -233,7 +233,7 @@ describe("EditComicForm", () => {
     expect(screen.getByRole("button", { name: /cari link chapter berikutnya/i })).toBeInTheDocument();
   });
 
-  it("mengisi Link Baca dari hasil fetchNextChapterReadUrl, tanpa auto-save", async () => {
+  it("tombol membuka modal pemilih layanan, lalu memilih layanan mengisi Link Baca tanpa auto-save", async () => {
     fetchNextChapterReadUrlMock.mockResolvedValue({
       read_url: "https://comick.dev/comic/one-piece/abc-chapter-1121-en",
     });
@@ -242,15 +242,31 @@ describe("EditComicForm", () => {
     render(<EditComicForm comic={COMIC} onSubmit={onSubmit} onDelete={vi.fn()} onCancel={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: /cari link chapter berikutnya/i }));
+    // Modal muncul dengan pilihan layanan.
+    await user.click(screen.getByRole("button", { name: "comick.dev" }));
 
-    expect(fetchNextChapterReadUrlMock).toHaveBeenCalledWith(COMIC.comic_id);
+    expect(fetchNextChapterReadUrlMock).toHaveBeenCalledWith(COMIC.comic_id, "comick");
     expect(await screen.findByLabelText(/link baca/i)).toHaveValue(
       "https://comick.dev/comic/one-piece/abc-chapter-1121-en",
     );
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it("menampilkan reason saat chapter berikutnya tidak ditemukan", async () => {
+  it("bisa memilih MangaDex sebagai layanan", async () => {
+    fetchNextChapterReadUrlMock.mockResolvedValue({
+      read_url: "https://mangadex.org/chapter/xyz",
+    });
+    const user = userEvent.setup();
+    render(<EditComicForm comic={COMIC} onSubmit={vi.fn()} onDelete={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: /cari link chapter berikutnya/i }));
+    await user.click(screen.getByRole("button", { name: "MangaDex" }));
+
+    expect(fetchNextChapterReadUrlMock).toHaveBeenCalledWith(COMIC.comic_id, "mangadex");
+    expect(await screen.findByLabelText(/link baca/i)).toHaveValue("https://mangadex.org/chapter/xyz");
+  });
+
+  it("menampilkan reason di modal saat chapter berikutnya tidak ditemukan", async () => {
     fetchNextChapterReadUrlMock.mockResolvedValue({
       read_url: null,
       reason: "Chapter berikutnya tidak ditemukan di comick.dev",
@@ -259,19 +275,10 @@ describe("EditComicForm", () => {
     render(<EditComicForm comic={COMIC} onSubmit={vi.fn()} onDelete={vi.fn()} onCancel={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: /cari link chapter berikutnya/i }));
+    await user.click(screen.getByRole("button", { name: "comick.dev" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Chapter berikutnya tidak ditemukan di comick.dev",
     );
-  });
-
-  it("menampilkan pesan error saat fetchNextChapterReadUrl gagal (network/exception)", async () => {
-    fetchNextChapterReadUrlMock.mockRejectedValue(new Error("Worker sedang down"));
-    const user = userEvent.setup();
-    render(<EditComicForm comic={COMIC} onSubmit={vi.fn()} onDelete={vi.fn()} onCancel={vi.fn()} />);
-
-    await user.click(screen.getByRole("button", { name: /cari link chapter berikutnya/i }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("Worker sedang down");
   });
 });

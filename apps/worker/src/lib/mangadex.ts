@@ -49,6 +49,16 @@ interface MangaDexSearchResponse {
   data: MangaDexMangaEntry[];
 }
 
+/** All four content ratings — REQUIRED to see 18+ titles (see fetchMangaDexInfo).
+ * Shared with the chapter-feed lookup in mangadexChapters.ts. */
+export const MANGADEX_CONTENT_RATING =
+  "&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica&contentRating[]=pornographic";
+
+/** Identifying UA — MangaDex rejects/throttles datacenter egress without one.
+ * Shared with mangadexChapters.ts so both requests carry the same header. */
+export const MANGADEX_UA =
+  "komik-tracker-worker/1.0 (personal comic tracker; contact via GitHub repo)";
+
 export interface MangaDexInfo {
   /** null when the matched entry has no cover art relationship. */
   cover_url: string | null;
@@ -85,32 +95,21 @@ function coverUrlFor(entry: MangaDexMangaEntry): string | null {
 }
 
 /**
- * Looks up a comic on MangaDex by title and returns both its cover URL and its
- * comic type. Returns null when no result is a confident title match — callers
- * treat that as "not found" rather than falling back to a guess.
+ * Searches MangaDex by title and returns the best-matching entry (raw, with
+ * `id` intact) or null if the request fails / no result is a confident title
+ * match. Shared by fetchMangaDexInfo (cover/type) and mangadexChapters.ts
+ * (next-chapter lookup) so there's one search implementation — mirrors the
+ * searchComickMatch pattern in comick.ts.
  */
-export async function fetchMangaDexInfo(title: string): Promise<MangaDexInfo | null> {
+export async function searchMangaDexMatch(title: string): Promise<MangaDexMangaEntry | null> {
   // limit=10 (not 1): the correct result is often not ranked first, so we need
   // candidates to verify against.
-  //
-  // contentRating[] is REQUIRED to see 18+ titles: MangaDex defaults to
-  // safe/suggestive/erotica and silently drops `pornographic`, so adult manhwa
-  // came back "not found" and their covers stayed empty. We request all four
-  // ratings — is_adult is a separate user-set field, not derived from this.
-  const contentRating =
-    "&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica&contentRating[]=pornographic";
-  const url = `https://api.mangadex.org/manga?title=${encodeURIComponent(title)}&limit=10&includes[]=cover_art${contentRating}`;
+  const url = `https://api.mangadex.org/manga?title=${encodeURIComponent(title)}&limit=10&includes[]=cover_art${MANGADEX_CONTENT_RATING}`;
 
-  const res = await fetch(url, {
-    headers: {
-      // MangaDex is known to reject/throttle requests without an identifying UA,
-      // especially from datacenter egress IPs (Cloudflare Workers included).
-      "User-Agent": "komik-tracker-worker/1.0 (personal comic tracker; contact via GitHub repo)",
-    },
-  });
+  const res = await fetch(url, { headers: { "User-Agent": MANGADEX_UA } });
   if (!res.ok) {
     console.error(
-      `fetchMangaDexInfo: search request failed (${res.status} ${res.statusText}) for title "${title}"`,
+      `searchMangaDexMatch: search request failed (${res.status} ${res.statusText}) for title "${title}"`,
     );
     return null;
   }
@@ -118,17 +117,33 @@ export async function fetchMangaDexInfo(title: string): Promise<MangaDexInfo | n
   const body = (await res.json()) as MangaDexSearchResponse;
   const entries = body.data ?? [];
   if (entries.length === 0) {
-    console.error(`fetchMangaDexInfo: no manga found for title "${title}"`);
+    console.error(`searchMangaDexMatch: no manga found for title "${title}"`);
     return null;
   }
 
   const match = pickBestMatch(entries, title);
   if (!match) {
     console.error(
-      `fetchMangaDexInfo: ${entries.length} kandidat ditemukan untuk "${title}", tapi tidak ada yang lolos ambang kemiripan (${STRICT_THRESHOLD} / ${RELAXED_THRESHOLD}+substring)`,
+      `searchMangaDexMatch: ${entries.length} kandidat ditemukan untuk "${title}", tapi tidak ada yang lolos ambang kemiripan (${STRICT_THRESHOLD} / ${RELAXED_THRESHOLD}+substring)`,
     );
     return null;
   }
+  return match;
+}
+
+/**
+ * Looks up a comic on MangaDex by title and returns both its cover URL and its
+ * comic type. Returns null when no result is a confident title match — callers
+ * treat that as "not found" rather than falling back to a guess.
+ *
+ * contentRating[] is REQUIRED to see 18+ titles: MangaDex defaults to
+ * safe/suggestive/erotica and silently drops `pornographic`, so adult manhwa
+ * came back "not found" and their covers stayed empty. We request all four
+ * ratings — is_adult is a separate user-set field, not derived from this.
+ */
+export async function fetchMangaDexInfo(title: string): Promise<MangaDexInfo | null> {
+  const match = await searchMangaDexMatch(title);
+  if (!match) return null;
 
   const coverUrl = coverUrlFor(match);
   if (!coverUrl) {

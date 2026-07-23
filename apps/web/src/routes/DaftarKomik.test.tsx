@@ -26,6 +26,9 @@ vi.mock("../lib/api/comics", async () => {
   };
 });
 
+const { launchReadingMock } = vi.hoisted(() => ({ launchReadingMock: vi.fn() }));
+vi.mock("../lib/openReading", () => ({ launchReading: launchReadingMock }));
+
 const ONE_PIECE: Comic = {
   comic_id: "1",
   title: "One Piece",
@@ -190,6 +193,20 @@ describe("DaftarKomik", () => {
     );
     await waitFor(() => expect(gridTitle("One Piece")).toBeInTheDocument());
     expect(screen.queryByText(`Edit Komik — ${ONE_PIECE.title}`)).not.toBeInTheDocument();
+  });
+
+  it("tombol Baca di card memanggil launchReading", async () => {
+    const user = userEvent.setup();
+    const withUrl: Comic = { ...ONE_PIECE, read_url: "https://comick.dev/x" };
+    fetchComicsMock.mockResolvedValue([withUrl]);
+    render(<DaftarKomik />);
+
+    await waitFor(() => expect(screen.getAllByText("One Piece").length).toBeGreaterThan(0));
+
+    await user.click(gridTitle("One Piece"));
+    await user.click(screen.getByRole("button", { name: `Baca ${withUrl.title}` }));
+
+    await waitFor(() => expect(launchReadingMock).toHaveBeenCalledWith(withUrl));
   });
 
   it("menampilkan prompt lanjut baca saat tab kembali terlihat setelah markReadingStarted", async () => {

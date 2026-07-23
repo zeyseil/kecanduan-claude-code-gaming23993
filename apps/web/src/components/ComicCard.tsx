@@ -22,6 +22,8 @@ interface ComicCardProps {
   onToggleSelect?: (comicId: string) => void;
   /** Toggle status ongoing/completed 1 klik — tombol muncul di pojok kiri-bawah saat pressed. */
   onToggleStatus?: (comic: Comic) => void;
+  /** Buka read_url komik. Tombol "Baca" overlay tengah cover muncul saat pressed HANYA kalau read_url terisi. */
+  onRead?: (comic: Comic) => void;
   /** Mode Aman aktif & cover ini belum dibuka: sensor cover kalau is_adult. */
   blurred?: boolean;
   /** Dipanggil saat user menekan "Tampilkan" pada cover 18+ tersensor. */
@@ -38,6 +40,7 @@ export function ComicCard({
   isSelected,
   onToggleSelect,
   onToggleStatus,
+  onRead,
   blurred,
   onReveal,
 }: ComicCardProps) {
@@ -187,6 +190,34 @@ export function ComicCard({
               <path d="M13.586 3.586a2 2 0 1 1 2.828 2.828l-8.5 8.5a2 2 0 0 1-.878.507l-3.06.874a.5.5 0 0 1-.618-.618l.874-3.06a2 2 0 0 1 .507-.878l8.5-8.5a2 2 0 0 1 0 0Z" />
             </svg>
           </button>
+        )}
+
+        {isPressed && onRead && comic.read_url && !censored && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <button
+              type="button"
+              aria-label={`Baca ${comic.title}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRead(comic);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600/95 px-4 py-2 text-sm font-semibold text-white shadow-lg hover:bg-indigo-500"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="h-4 w-4"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M6.3 2.84A1 1 0 0 0 4.8 3.7v12.6a1 1 0 0 0 1.5.86l10.5-6.3a1 1 0 0 0 0-1.72L6.3 2.84Z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              Baca
+            </button>
+          </div>
         )}
       </div>
 

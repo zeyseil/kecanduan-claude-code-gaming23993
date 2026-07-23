@@ -8,7 +8,7 @@ import { userAuth } from "../middleware/userAuth";
 import { rateLimit } from "../middleware/rateLimit";
 import type { Role } from "../lib/authValue";
 import { fetchComicInfo } from "../lib/comicInfo";
-import { findNextChapterUrl } from "../lib/comickChapters";
+import { resolveNextChapter, isChapterSourceId } from "../lib/chapterSources";
 
 // Deterministic import path (no AI): score >= this means "same comic", so the
 // entry updates latest_chapter instead of creating a duplicate. Chosen higher
@@ -422,9 +422,16 @@ comics.post("/detect-type", async (c) => {
 // retry button. comick's `hid` is used transiently inside findNextChapterUrl
 // and is never persisted or returned here.
 comics.post("/fetch-read-url", async (c) => {
-  const body = await c.req.json<{ comic_id?: unknown }>().catch(() => ({}) as { comic_id?: unknown });
+  const body = await c.req
+    .json<{ comic_id?: unknown; source?: unknown }>()
+    .catch(() => ({}) as { comic_id?: unknown; source?: unknown });
   if (typeof body.comic_id !== "string" || body.comic_id.trim() === "") {
     return c.json({ error: "comic_id harus string" }, 400);
+  }
+  // source opsional — default comick.dev supaya klien lama (tanpa field) tetap jalan.
+  const source = body.source ?? "comick";
+  if (!isChapterSourceId(source)) {
+    return c.json({ error: "source tidak dikenali" }, 400);
   }
 
   const userId = c.get("userId");
@@ -434,7 +441,7 @@ comics.post("/fetch-read-url", async (c) => {
     return c.json({ read_url: null, reason: "comic tidak ditemukan" }, 404);
   }
 
-  const result = await findNextChapterUrl(comic.title, comic.latest_chapter, c.env);
+  const result = await resolveNextChapter(source, comic.title, comic.latest_chapter, c.env);
   return c.json(result);
 });
 

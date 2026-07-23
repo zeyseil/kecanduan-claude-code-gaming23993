@@ -216,7 +216,8 @@ describe("fetchNextChapterReadUrl", () => {
       expect.objectContaining({
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer test-token" },
-        body: JSON.stringify({ comic_id: "1" }),
+        // source default "comick" saat tidak diberikan
+        body: JSON.stringify({ comic_id: "1", source: "comick" }),
       }),
     );
   });

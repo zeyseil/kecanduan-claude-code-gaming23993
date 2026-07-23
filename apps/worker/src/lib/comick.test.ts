@@ -6,7 +6,7 @@ import { fetchComickInfo } from "./comick";
 const env = {} as Env;
 
 function stub(response: unknown, status = 200) {
-  const fn = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify(response), { status }));
+  const fn = vi.fn(async () => new Response(JSON.stringify(response), { status }));
   vi.stubGlobal("fetch", fn);
   return fn;
 }
