@@ -154,7 +154,7 @@ export function ComicCard({
               e.stopPropagation();
               onToggleStatus(comic);
             }}
-            className="absolute bottom-1.5 left-1.5 rounded-full bg-slate-900/80 p-1.5 text-slate-100 shadow hover:bg-slate-900"
+            className="absolute bottom-1.5 left-1.5 z-10 rounded-full bg-slate-900/80 p-2.5 text-slate-100 shadow hover:bg-slate-900"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -179,7 +179,7 @@ export function ComicCard({
               e.stopPropagation();
               onEdit(comic);
             }}
-            className="absolute bottom-1.5 right-1.5 rounded-full bg-slate-900/80 p-1.5 text-slate-100 shadow hover:bg-slate-900"
+            className="absolute bottom-1.5 right-1.5 z-10 rounded-full bg-slate-900/80 p-2.5 text-slate-100 shadow hover:bg-slate-900"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -193,7 +193,7 @@ export function ComicCard({
         )}
 
         {isPressed && onRead && comic.read_url && !censored && (
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <button
               type="button"
               aria-label={`Baca ${comic.title}`}
@@ -201,7 +201,7 @@ export function ComicCard({
                 e.stopPropagation();
                 onRead(comic);
               }}
-              className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600/95 px-4 py-2 text-sm font-semibold text-white shadow-lg hover:bg-indigo-500"
+              className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-indigo-600/95 px-4 py-2 text-sm font-semibold text-white shadow-lg hover:bg-indigo-500"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
