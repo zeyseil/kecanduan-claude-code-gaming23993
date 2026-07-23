@@ -168,6 +168,8 @@ export const CHAPTER_SOURCES = [
   { id: "comick", label: "comick.dev" },
   { id: "mangadex", label: "MangaDex" },
   { id: "shinigami", label: "Shinigami (ID)" },
+  { id: "komiku", label: "Komiku (ID)" },
+  { id: "kiryuu", label: "Kiryuu (ID)" },
 ] as const;
 
 export type ChapterSourceId = (typeof CHAPTER_SOURCES)[number]["id"];

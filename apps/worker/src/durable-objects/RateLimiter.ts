@@ -86,3 +86,10 @@ export async function acquireKomikuSlot(namespace: DurableObjectNamespace): Prom
 export async function acquireShinigamiSlot(namespace: DurableObjectNamespace): Promise<void> {
   await acquireSlot(namespace, "shinigami", 5, 3);
 }
+
+/** Kiryuu (v7.kiryuu.to) — public site called directly (not behind a
+ * bot-challenge); moderate budget, same as comick since it's a real site, not
+ * a free third-party scraper instance. */
+export async function acquireKiryuuSlot(namespace: DurableObjectNamespace): Promise<void> {
+  await acquireSlot(namespace, "kiryuu", 5, 3);
+}

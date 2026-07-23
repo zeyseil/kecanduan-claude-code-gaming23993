@@ -7,11 +7,15 @@ import type { Env } from "../env";
 import { findNextChapterUrl, type NextChapterResult } from "./comickChapters";
 import { findNextChapterUrlMangaDex } from "./mangadexChapters";
 import { findNextChapterUrlShinigami } from "./shinigamiChapters";
+import { findNextChapterUrlKomiku } from "./komikuChapters";
+import { findNextChapterUrlKiryuu } from "./kiryuuChapters";
 
 export const CHAPTER_SOURCES = [
   { id: "comick", label: "comick.dev" },
   { id: "mangadex", label: "MangaDex" },
   { id: "shinigami", label: "Shinigami (ID)" },
+  { id: "komiku", label: "Komiku (ID)" },
+  { id: "kiryuu", label: "Kiryuu (ID)" },
 ] as const;
 
 export type ChapterSourceId = (typeof CHAPTER_SOURCES)[number]["id"];
@@ -33,6 +37,10 @@ export function resolveNextChapter(
       return findNextChapterUrlMangaDex(title, afterChapter, env);
     case "shinigami":
       return findNextChapterUrlShinigami(title, afterChapter, env);
+    case "komiku":
+      return findNextChapterUrlKomiku(title, afterChapter, env);
+    case "kiryuu":
+      return findNextChapterUrlKiryuu(title, afterChapter, env);
     case "comick":
     default:
       return findNextChapterUrl(title, afterChapter, env);

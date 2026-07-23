@@ -32,6 +32,11 @@ PROCESS_LOG_COLLECTION=process_log
 # COMICK_API_URL=
 # KOMIKU_API_URL=
 
+# (Opsional) Override base URL Kiryuu (sumber "Cari link chapter berikutnya",
+# bahasa Indonesia, fokus manga). Kosong = default https://v7.kiryuu.to. Isi
+# kalau Kiryuu pindah versi domain (situs ini beberapa kali ganti, mis. v7).
+# KIRYUU_API_URL=
+
 # CATATAN: tidak ada secret Langflow di sini lagi. Orkestrasi AI sekarang jalan
 # di dalam Worker (src/agent/), memanggil Gemini langsung dengan API key milik
 # user yang dikirim per-request — tidak pernah disimpan di server.

@@ -24,6 +24,10 @@ export interface Env {
   /** (Opsional) Override base URL frontend Shinigami untuk membangun link baca
    * chapter. Kosong = default https://g.shinigami.asia. */
   SHINIGAMI_READER_URL?: string;
+  /** (Opsional) Override base URL Kiryuu. Kosong = default https://v7.kiryuu.to
+   * (lihat lib/kiryuu.ts). Escape-hatch kalau Kiryuu pindah versi domain
+   * (v7 -> v8 dst, situs ini pernah beberapa kali). */
+  KIRYUU_API_URL?: string;
   RATE_LIMITER: DurableObjectNamespace;
   USER_RATE_LIMITER: DurableObjectNamespace;
   AUTH_TOKENS: KVNamespace;

@@ -75,11 +75,14 @@ export function ChapterSourceModal({ comicId, onResult, onClose }: ChapterSource
 
       <p className="mt-3 text-xs text-slate-500">
         <strong className="text-slate-400">Batasan fitur ini:</strong> comick.dev &amp; MangaDex
-        mencari chapter bahasa Inggris; Shinigami (ID) bahasa Indonesia. Pencarian berdasarkan
-        Chapter Terakhir Dibaca yang SUDAH TERSIMPAN (Simpan dulu kalau baru mengubah angkanya).
-        MangaDex sering tidak punya chapter untuk judul populer yang sudah berlisensi resmi — coba
-        comick.dev atau Shinigami. Tiap sumber hanya menemukan judul yang ADA di katalognya; katalog
-        sangat panjang mungkin tidak ketemu — isi manual kalau begitu.
+        mencari chapter bahasa Inggris; Shinigami, Komiku, dan Kiryuu (semua ID) bahasa Indonesia.
+        Pencarian berdasarkan Chapter Terakhir Dibaca yang SUDAH TERSIMPAN (Simpan dulu kalau baru
+        mengubah angkanya). MangaDex sering tidak punya chapter untuk judul populer yang sudah
+        berlisensi resmi — coba comick.dev atau sumber ID. Komiku butuh instance yang di-deploy
+        sendiri (KOMIKU_API_URL) — bisa tidak tersedia kalau belum dikonfigurasi. Kiryuu dibaca
+        langsung dari halaman situsnya (bukan API resmi) sehingga paling rentan berhenti bekerja
+        kalau situsnya berganti tampilan. Tiap sumber hanya menemukan judul yang ADA di katalognya;
+        katalog sangat panjang mungkin tidak ketemu — isi manual kalau begitu.
       </p>
     </div>
   );
