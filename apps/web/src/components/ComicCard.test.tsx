@@ -170,4 +170,32 @@ describe("ComicCard", () => {
     render(<ComicCard comic={comic({ is_adult: true })} blurred />);
     expect(screen.queryByRole("button", { name: "Tampilkan" })).not.toBeInTheDocument();
   });
+
+  it("menampilkan tombol Baca saat pressed & read_url terisi", async () => {
+    const user = userEvent.setup();
+    const onRead = vi.fn();
+    const c = comic({ read_url: "https://comick.dev/x" });
+    render(<ComicCard comic={c} isPressed onRead={onRead} />);
+
+    const readBtn = screen.getByRole("button", { name: /baca contoh komik/i });
+    await user.click(readBtn);
+    expect(onRead).toHaveBeenCalledWith(c);
+  });
+
+  it("tidak menampilkan tombol Baca kalau read_url kosong", () => {
+    render(<ComicCard comic={comic({ read_url: null })} isPressed onRead={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /baca contoh komik/i })).not.toBeInTheDocument();
+  });
+
+  it("tidak menampilkan tombol Baca saat cover tersensor (Mode Aman)", () => {
+    render(
+      <ComicCard
+        comic={comic({ read_url: "https://comick.dev/x", is_adult: true })}
+        isPressed
+        blurred
+        onRead={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /baca contoh komik/i })).not.toBeInTheDocument();
+  });
 });

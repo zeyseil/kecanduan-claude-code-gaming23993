@@ -161,14 +161,27 @@ export interface FetchReadUrlResult {
   reason?: string;
 }
 
-/** "Cari link chapter berikutnya" — comick.dev lookup for the chapter right
- * after this comic's stored latest_chapter. Never auto-saves; caller fills
- * its own form state and the user still clicks Simpan. */
-export async function fetchNextChapterReadUrl(comicId: string): Promise<FetchReadUrlResult> {
+// Mirror of CHAPTER_SOURCES in apps/worker/src/lib/chapterSources.ts — kept in
+// sync manually (same convention as TYPE_TAGS). Adding a source here alone does
+// nothing; it needs a matching resolver on the Worker.
+export const CHAPTER_SOURCES = [
+  { id: "comick", label: "comick.dev" },
+  { id: "mangadex", label: "MangaDex" },
+] as const;
+
+export type ChapterSourceId = (typeof CHAPTER_SOURCES)[number]["id"];
+
+/** "Cari link chapter berikutnya" — looks up the chapter right after this
+ * comic's stored latest_chapter on the chosen source. Never auto-saves; caller
+ * fills its own form state and the user still clicks Simpan. */
+export async function fetchNextChapterReadUrl(
+  comicId: string,
+  source: ChapterSourceId = "comick",
+): Promise<FetchReadUrlResult> {
   const res = await apiFetch(`${BASE_URL}/comics/fetch-read-url`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ comic_id: comicId }),
+    body: JSON.stringify({ comic_id: comicId, source }),
   });
   const body = (await res.json().catch(() => null)) as (FetchReadUrlResult & { error?: string }) | null;
   if (!res.ok && !body?.reason) {

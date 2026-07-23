@@ -923,6 +923,82 @@ describe("/comics", () => {
 
       vi.unstubAllGlobals();
     });
+
+    it("rejects an unknown source", async () => {
+      const createRes = await request("/comics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "X",
+          type_tag: "manga",
+          is_adult: false,
+          latest_chapter: 1,
+          status: "ongoing",
+        }),
+      });
+      const created = (await createRes.json()) as Comic;
+
+      const res = await request("/comics/fetch-read-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comic_id: created.comic_id, source: "anilist" }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("uses the MangaDex resolver when source is mangadex", async () => {
+      const createRes = await request("/comics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "Berserk",
+          type_tag: "manga",
+          is_adult: false,
+          latest_chapter: 200,
+          status: "ongoing",
+        }),
+      });
+      const created = (await createRes.json()) as Comic;
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          const u = String(url);
+          if (u.includes("/manga?title=")) {
+            return new Response(
+              JSON.stringify({
+                data: [
+                  {
+                    id: "manga-1",
+                    attributes: { title: { en: "Berserk" }, altTitles: [], originalLanguage: "ja" },
+                    relationships: [{ type: "cover_art", attributes: { fileName: "c.jpg" } }],
+                  },
+                ],
+              }),
+              { status: 200 },
+            );
+          }
+          if (u.includes("/chapter?manga=")) {
+            return new Response(
+              JSON.stringify({ data: [{ id: "chap-201", attributes: { chapter: "201" } }, { id: "chap-200", attributes: { chapter: "200" } }] }),
+              { status: 200 },
+            );
+          }
+          return new Response("not found", { status: 404 });
+        }),
+      );
+
+      const res = await request("/comics/fetch-read-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comic_id: created.comic_id, source: "mangadex" }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { read_url: string | null };
+      expect(body.read_url).toBe("https://mangadex.org/chapter/chap-201");
+
+      vi.unstubAllGlobals();
+    });
   });
 
   describe("POST /comics/detect-type", () => {

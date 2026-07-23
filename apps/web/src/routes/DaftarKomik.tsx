@@ -38,6 +38,7 @@ import { Pagination } from "../components/Pagination";
 import { ContinueReadingPrompt } from "../components/ContinueReadingPrompt";
 import { takeReadingSession } from "../lib/readingSession";
 import { readComicCache, writeComicCache } from "../lib/comicCache";
+import { launchReading } from "../lib/openReading";
 import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { COMIC_UPDATED_EVENT } from "../lib/floatingReader";
@@ -353,6 +354,7 @@ export function DaftarKomik() {
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
               onToggleStatus={handleToggleStatus}
+              onRead={launchReading}
               safeMode={safeMode}
               revealedIds={revealedIds}
               onReveal={setRevealComic}
