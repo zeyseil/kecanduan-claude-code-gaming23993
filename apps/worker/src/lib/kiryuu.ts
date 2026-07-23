@@ -15,10 +15,22 @@
 //   1. GET {base}/wp-admin/admin-ajax.php?type=search_form&action=get_nonce
 //      -> HTML fragment containing <input name='search_nonce' value='...'>
 //   2. POST {base}/wp-admin/admin-ajax.php?nonce={nonce}&action=search
-//      body: search_term={title} (form-encoded)
+//      body: query={title} (form-encoded)
 //      -> HTML fragment: repeated `<a href="{base}/manga/{slug}/">...
-//         <h3 ...>{title}</h3>...</a>` cards. No cookies/session needed —
-//         confirmed live with a fresh nonce per request.
+//         <h3 ...>{title}</h3>...</a>` cards, or a `#searchNoResults` block
+//         when nothing matches. No cookies/session needed — confirmed live
+//         with a fresh nonce per request.
+//
+// IMPORTANT (found live after shipping, not during planning): the search
+// modal's actual input is `<input name="query" ...>` — NOT `search_term`
+// (that name only appears in the unrelated "Show more results" link's query
+// string, `/advanced-search/?search_term=`). Posting the wrong field name
+// doesn't error — the endpoint silently falls back to a fixed
+// "popular/featured" list (Martial Peak, Magic Emperor, Solo Leveling,
+// Mercenary Enrollment, Solo Max-Level Newbie) regardless of what was
+// searched. This is why the original live smoke test with "solo leveling"
+// looked like it worked (Solo Leveling happens to be in that static list) —
+// it was a false positive. Any other title always resolved to "not found".
 
 import type { Env } from "../env";
 import { pickBestTitleMatch } from "./titleMatch";
@@ -94,7 +106,7 @@ export async function searchKiryuuMatch(title: string, env: Env): Promise<Kiryuu
         "User-Agent": KIRYUU_UA,
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: `search_term=${encodeURIComponent(title)}`,
+      body: `query=${encodeURIComponent(title)}`,
     });
   } catch (err) {
     console.error(`searchKiryuuMatch: search request error for "${title}": ${String(err)}`);

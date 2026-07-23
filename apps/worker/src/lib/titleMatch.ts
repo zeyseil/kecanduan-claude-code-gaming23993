@@ -41,8 +41,8 @@ const SUBSTRING_MIN_LENGTH_RATIO = 0.5;
  * near-empty, overly-generic fragment (e.g. "Season 2: ..."). */
 const CORE_TITLE_MIN_CHARS = 8;
 
-/** Text before the first ":", "~", or "," (whichever comes first), if that
- * leaves a substantial fragment — null when there's no separator or the
+/** Text before the first ":", "~", ",", or " - " (whichever comes first), if
+ * that leaves a substantial fragment — null when there's no separator or the
  * fragment is too short/generic to be a safe extra candidate.
  *
  * "," is included because some official titles extend the core with a
@@ -51,12 +51,25 @@ const CORE_TITLE_MIN_CHARS = 8;
  * Shite Shimau. ~Jakushou Kokka ga...~" — cutting only at the tilde still
  * leaves the comma-joined clause attached, so the derived core is still too
  * long to score above threshold against the short query). Taking the
- * leftmost separator naturally picks the shortest/most conservative core. */
+ * leftmost separator naturally picks the shortest/most conservative core.
+ *
+ * " - " (space-dash-space, not a bare "-") is included for the same reason —
+ * dogfooding case on Kiryuu: "Isekai Koushoku Musou Roku - Isekai Tensei no
+ * Chie to Chikara wo, Tada Hitasura XXXX suru Tame ni Tsukau" scores 0.21
+ * against the short query "Isekai Koushoku Musou" (0.34 even after cutting at
+ * the comma), but 0.81 after cutting at " - ". Requiring surrounding spaces
+ * (not a bare "-") avoids misfiring on hyphenated compound words like
+ * "Re-Monster" or "X-Men", which never have spaces around the hyphen. Checked
+ * against the existing "CMYK - sameda" case (documented as unfixable via any
+ * separator, titleMatch.test.ts) to confirm this doesn't resurrect it: its
+ * dash-derived core ("CMYK") still scores only 0.36 against that query, well
+ * under threshold — this addition doesn't change that case's outcome. */
 function deriveCoreTitle(title: string): string | null {
   const colonIndex = title.indexOf(":");
   const tildeIndex = title.indexOf("~");
   const commaIndex = title.indexOf(",");
-  const candidates = [colonIndex, tildeIndex, commaIndex].filter((i) => i >= 0);
+  const dashIndex = title.indexOf(" - ");
+  const candidates = [colonIndex, tildeIndex, commaIndex, dashIndex].filter((i) => i >= 0);
   if (candidates.length === 0) return null;
 
   const cut = Math.min(...candidates);

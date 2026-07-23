@@ -48,13 +48,17 @@ describe("searchKiryuuMatch", () => {
     expect(match).toEqual({ title: "Solo Leveling", url: "https://v7.kiryuu.to/manga/solo-leveling/" });
   });
 
-  it("sends the nonce and search term on the POST request", async () => {
+  it("sends the nonce and search term on the POST request using the 'query' field", async () => {
+    // Regression guard: the search modal's real input is name="query", NOT
+    // "search_term" (that name only appears in an unrelated "show more"
+    // link) — posting the wrong field silently returns a fixed fallback list
+    // instead of erroring, so this must be pinned exactly. See module comment.
     const fn = stub(NONCE_HTML, SEARCH_HTML);
     await searchKiryuuMatch("Solo Leveling", enabledEnv);
     const calls = fn.mock.calls as unknown as Array<[string, RequestInit?]>;
     const searchCall = calls.find((c) => c[0].includes("action=search"));
     expect(searchCall?.[0]).toContain("nonce=2be9814f9d");
-    expect(searchCall?.[1]?.body).toBe("search_term=Solo%20Leveling");
+    expect(searchCall?.[1]?.body).toBe("query=Solo%20Leveling");
   });
 
   it("returns null when the nonce request fails", async () => {

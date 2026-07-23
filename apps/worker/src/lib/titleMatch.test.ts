@@ -83,6 +83,26 @@ describe("isAcceptableTitleMatch", () => {
       isAcceptableTitleMatch("CMYK - sameda", ["CMYK - Sameda Kazuou wa Chuunibyou ga Naosenai"]),
     ).toBe(false);
   });
+
+  it("cuts at a ' - ' separator for a long official title (kasus Kiryuu)", () => {
+    // Real Kiryuu title — the query only covers the part before " - "; the
+    // full title (and the comma-derived core) both score well under
+    // threshold, but cutting at the dash clears it.
+    expect(
+      isAcceptableTitleMatch("Isekai Koushoku Musou", [
+        "Isekai Koushoku Musou Roku - Isekai Tensei no Chie to Chikara wo, Tada Hitasura XXXX suru Tame ni Tsukau",
+      ]),
+    ).toBe(true);
+  });
+
+  it("does not resurrect the CMYK case via the new ' - ' separator", () => {
+    // Confirms the dash addition doesn't change this documented-unfixable
+    // case's outcome — its dash-derived core ("CMYK") still scores well
+    // under threshold against "CMYK - sameda".
+    expect(
+      isAcceptableTitleMatch("CMYK - sameda", ["CMYK - Sameda Kazuou wa Chuunibyou ga Naosenai"]),
+    ).toBe(false);
+  });
 });
 
 describe("pickBestTitleMatch", () => {
