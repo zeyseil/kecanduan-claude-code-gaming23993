@@ -2,23 +2,33 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { emit, listen } from "@tauri-apps/api/event";
-import type { Comic } from "../types/comic";
-import { fetchComics, patchComic } from "../lib/api/comics";
+import { patchComic } from "../lib/api/comics";
 import { setAuthToken } from "../lib/storage";
 import { formatChapter } from "../lib/format";
 import { ChapterUpdateForm } from "../components/ChapterUpdateForm";
-import { COMIC_UPDATED_EVENT, FLOATING_READER_SET_COMIC_EVENT } from "../lib/floatingReader";
+import {
+  COMIC_UPDATED_EVENT,
+  FLOATING_READER_SET_COMIC_EVENT,
+  type FloatingReaderComicPayload,
+} from "../lib/floatingReader";
 
 /**
  * Konten window companion always-on-top (Tauri only) yang dibuka lewat
  * openOrFocusFloatingReader() saat klik "Lanjutkan Membaca" di HeroBanner.
  * Window ITU SENDIRI sudah jadi "dialog" — tidak ada modal/backdrop di sini.
+ *
+ * Judul+chapter dibaca langsung dari query string (dikirim oleh
+ * openOrFocusFloatingReader) — TIDAK fetchComics() di sini, supaya window
+ * render seketika tanpa menunggu round-trip ke Worker (dulu terasa lambat
+ * karena narik seluruh daftar komik hanya untuk cari satu comic_id).
  */
 export function FloatingReader() {
   const [searchParams] = useSearchParams();
-  const [comicId, setComicId] = useState(() => searchParams.get("comicId") ?? "");
-  const [comic, setComic] = useState<Comic | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [comic, setComic] = useState<FloatingReaderComicPayload>(() => ({
+    comicId: searchParams.get("comicId") ?? "",
+    title: searchParams.get("title") ?? "",
+    latestChapter: Number(searchParams.get("latestChapter") ?? 0),
+  }));
   const [showUpdateForm, setShowUpdateForm] = useState(false);
 
   // Fallback kalau localStorage ternyata tidak dibagi antar window Tauri —
@@ -29,30 +39,14 @@ export function FloatingReader() {
   }, [searchParams]);
 
   useEffect(() => {
-    const unlisten = listen<{ comicId: string }>(FLOATING_READER_SET_COMIC_EVENT, (event) => {
-      setComicId(event.payload.comicId);
+    const unlisten = listen<FloatingReaderComicPayload>(FLOATING_READER_SET_COMIC_EVENT, (event) => {
+      setComic(event.payload);
       setShowUpdateForm(false);
     });
     return () => {
       void unlisten.then((fn) => fn());
     };
   }, []);
-
-  useEffect(() => {
-    if (!comicId) return;
-    let alive = true;
-    fetchComics()
-      .then((comics) => {
-        if (!alive) return;
-        setComic(comics.find((c) => c.comic_id === comicId) ?? null);
-      })
-      .catch((err) => {
-        if (alive) setLoadError(err instanceof Error ? err.message : "Gagal memuat data komik.");
-      });
-    return () => {
-      alive = false;
-    };
-  }, [comicId]);
 
   const handleBackToApp = async () => {
     const main = await WebviewWindow.getByLabel("main");
@@ -61,29 +55,28 @@ export function FloatingReader() {
   };
 
   const handleUpdate = async (latestChapter: number) => {
-    const updated = await patchComic(comicId, { latest_chapter: latestChapter });
+    const updated = await patchComic(comic.comicId, { latest_chapter: latestChapter });
     await emit(COMIC_UPDATED_EVENT, updated);
-    setComic(updated);
+    setComic({ comicId: updated.comic_id, title: updated.title, latestChapter: updated.latest_chapter });
     setShowUpdateForm(false);
   };
 
-  if (loadError) {
+  if (!comic.comicId) {
     return (
-      <div className="flex h-screen flex-col justify-between bg-slate-900 p-3 text-slate-100">
-        <p className="text-sm text-rose-400">{loadError}</p>
-        <BackButton onClick={handleBackToApp} />
+      <div className="flex h-screen items-center justify-center bg-slate-900 p-3 text-center text-sm text-rose-400">
+        Data komik tidak lengkap.
       </div>
     );
-  }
-
-  if (!comic) {
-    return <div className="flex h-screen items-center justify-center bg-slate-900 text-sm text-slate-400">Memuat…</div>;
   }
 
   if (showUpdateForm) {
     return (
       <div className="flex h-screen flex-col overflow-y-auto bg-slate-900 p-3 text-slate-100">
-        <ChapterUpdateForm comic={comic} onUpdate={handleUpdate} onDismiss={() => setShowUpdateForm(false)} />
+        <ChapterUpdateForm
+          comic={{ title: comic.title, latest_chapter: comic.latestChapter }}
+          onUpdate={handleUpdate}
+          onDismiss={() => setShowUpdateForm(false)}
+        />
       </div>
     );
   }
@@ -94,7 +87,7 @@ export function FloatingReader() {
         <p className="line-clamp-2 text-sm font-semibold" title={comic.title}>
           {comic.title}
         </p>
-        <p className="mt-1 text-xs text-slate-400">Chapter {formatChapter(comic.latest_chapter)}</p>
+        <p className="mt-1 text-xs text-slate-400">Chapter {formatChapter(comic.latestChapter)}</p>
       </div>
       <div className="flex flex-col gap-2">
         <button
@@ -121,4 +114,3 @@ function BackButton({ onClick }: { onClick: () => void }) {
     </button>
   );
 }
-

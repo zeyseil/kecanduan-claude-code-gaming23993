@@ -57,7 +57,7 @@ export function HeroBanner({ comics, onEdit, safeMode = false, revealedIds }: He
               // Di Tauri, window companion (FloatingReader) menggantikan peran
               // readingSession/ContinueReadingPrompt — lihat DaftarKomik.tsx.
               if (isTauri()) {
-                void openOrFocusFloatingReader(latest.comic_id);
+                void openOrFocusFloatingReader(latest);
               } else {
                 markReadingStarted(latest.comic_id);
               }
