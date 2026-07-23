@@ -49,7 +49,7 @@ export function ChapterSourceModal({
   return (
     <div className="w-full max-w-xs rounded-lg bg-slate-800 p-4 shadow-xl">
       <div className="mb-3 flex items-start justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <h3 className="text-sm font-semibold text-slate-100">Pilih layanan</h3>
           <p className="truncate text-xs text-slate-400" title={title}>
             untuk: {title}

@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Samakan dengan bg Shell (App.tsx) — tanpa ini, overscroll/overflow di mobile
+   menampakkan background putih default html/body di tepi layar. */
+html,
+body {
+  background-color: theme("colors.slate.950");
+}
+
 /* Custom scrollbar mengikuti token warna aplikasi (slate/indigo) */
 * {
   scrollbar-width: thin;
