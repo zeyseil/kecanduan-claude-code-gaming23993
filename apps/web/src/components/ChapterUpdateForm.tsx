@@ -2,7 +2,10 @@ import { useState } from "react";
 import type { Comic } from "../types/comic";
 
 interface ChapterUpdateFormProps {
-  comic: Comic;
+  // Cuma butuh title+latest_chapter untuk tampilan/default value — dilonggarkan
+  // dari `Comic` penuh supaya FloatingReader bisa memakainya tanpa fetch objek
+  // Comic lengkap (lihat lib/floatingReader.ts).
+  comic: Pick<Comic, "title" | "latest_chapter">;
   onUpdate: (latestChapter: number) => Promise<void>;
   onDismiss: () => void;
 }

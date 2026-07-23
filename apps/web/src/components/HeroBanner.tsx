@@ -2,9 +2,8 @@ import type { Comic } from "../types/comic";
 import { selectRecent } from "../lib/comicList";
 import { formatChapter } from "../lib/format";
 import { markReadingStarted } from "../lib/readingSession";
-import { handleExternalLinkClick } from "../lib/externalLink";
 import { isTauri } from "@tauri-apps/api/core";
-import { openOrFocusFloatingReader } from "../lib/floatingReader";
+import { startInAppReading } from "../lib/floatingReader";
 
 const TYPE_LABEL: Record<Comic["type_tag"], string> = {
   manga: "Manga",
@@ -54,14 +53,16 @@ export function HeroBanner({ comics, onEdit, safeMode = false, revealedIds }: He
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => {
-              // Di Tauri, window companion (FloatingReader) menggantikan peran
-              // readingSession/ContinueReadingPrompt — lihat DaftarKomik.tsx.
+              // Di Tauri, baca komik dibuka DI DALAM app (window webview reader)
+              // + companion always-on-top — menggantikan peran browser sistem
+              // dan readingSession/ContinueReadingPrompt (lihat DaftarKomik.tsx).
               if (isTauri()) {
-                void openOrFocusFloatingReader(latest.comic_id);
+                e.preventDefault();
+                void startInAppReading(latest, latest.read_url as string);
               } else {
                 markReadingStarted(latest.comic_id);
+                // Web biasa: biarkan <a target="_blank"> default membuka tab.
               }
-              handleExternalLinkClick(latest.read_url as string, e);
             }}
             className="mt-2 inline-flex w-fit items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
           >
