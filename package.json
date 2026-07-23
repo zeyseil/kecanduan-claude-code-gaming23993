@@ -13,9 +13,17 @@
     "lint": "pnpm --filter web lint",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "cap:sync": "pnpm --filter web build && cap sync android",
+    "cap:open": "cap open android"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7",
     "@tauri-apps/cli": "^2.11.4"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7",
+    "@capacitor/browser": "^7",
+    "@capacitor/core": "^7"
   }
 }

@@ -1,8 +1,9 @@
+import { Browser } from "@capacitor/browser";
 import type { Comic } from "../types/comic";
 import { selectRecent } from "../lib/comicList";
 import { formatChapter } from "../lib/format";
 import { markReadingStarted } from "../lib/readingSession";
-import { isTauri } from "@tauri-apps/api/core";
+import { isTauriApp, isCapacitorApp } from "../lib/platform";
 import { startInAppReading } from "../lib/floatingReader";
 
 const TYPE_LABEL: Record<Comic["type_tag"], string> = {
@@ -56,13 +57,24 @@ export function HeroBanner({ comics, onEdit, safeMode = false, revealedIds }: He
               // Di Tauri, baca komik dibuka DI DALAM app (window webview reader)
               // + companion always-on-top — menggantikan peran browser sistem
               // dan readingSession/ContinueReadingPrompt (lihat DaftarKomik.tsx).
-              if (isTauri()) {
+              if (isTauriApp()) {
                 e.preventDefault();
                 void startInAppReading(latest, latest.read_url as string);
-              } else {
-                markReadingStarted(latest.comic_id);
-                // Web biasa: biarkan <a target="_blank"> default membuka tab.
+                return;
               }
+              // Di Capacitor (Android), buka in-app Custom Tab lewat
+              // @capacitor/browser — tanpa ini, WebView Android otomatis
+              // membuka browser eksternal untuk link ke luar server.url.
+              // ContinueReadingPrompt (visibilitychange) tetap dipakai saat
+              // Custom Tab ditutup dan fokus kembali ke app.
+              if (isCapacitorApp()) {
+                e.preventDefault();
+                markReadingStarted(latest.comic_id);
+                void Browser.open({ url: latest.read_url as string });
+                return;
+              }
+              markReadingStarted(latest.comic_id);
+              // Web biasa: biarkan <a target="_blank"> default membuka tab.
             }}
             className="mt-2 inline-flex w-fit items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
           >

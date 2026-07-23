@@ -5,11 +5,19 @@ import { HeroBanner } from "./HeroBanner";
 import type { Comic } from "../types/comic";
 import { takeReadingSession } from "../lib/readingSession";
 
-const { isTauriMock, startInAppReadingMock } = vi.hoisted(() => ({
-  isTauriMock: vi.fn(() => false),
-  startInAppReadingMock: vi.fn(() => Promise.resolve()),
-}));
+const { isTauriMock, isNativePlatformMock, browserOpenMock, startInAppReadingMock } = vi.hoisted(
+  () => ({
+    isTauriMock: vi.fn(() => false),
+    isNativePlatformMock: vi.fn(() => false),
+    browserOpenMock: vi.fn(() => Promise.resolve()),
+    startInAppReadingMock: vi.fn(() => Promise.resolve()),
+  }),
+);
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: isTauriMock }));
+vi.mock("@capacitor/core", () => ({
+  Capacitor: { isNativePlatform: isNativePlatformMock },
+}));
+vi.mock("@capacitor/browser", () => ({ Browser: { open: browserOpenMock } }));
 vi.mock("../lib/floatingReader", () => ({ startInAppReading: startInAppReadingMock }));
 
 function comic(overrides: Partial<Comic> = {}): Comic {
@@ -83,5 +91,21 @@ describe("HeroBanner", () => {
     // Jalur web (markReadingStarted) TIDAK dipakai di Tauri.
     expect(takeReadingSession()).toBeNull();
     isTauriMock.mockReturnValue(false);
+  });
+
+  it("di Capacitor (Android): buka in-app Custom Tab dan tetap menandai sesi baca", async () => {
+    isNativePlatformMock.mockReturnValue(true);
+    browserOpenMock.mockClear();
+    startInAppReadingMock.mockClear();
+    const user = userEvent.setup();
+    const latest = comic({ comic_id: "droid", read_url: "https://example.com/read/x" });
+    render(<HeroBanner comics={[latest]} onEdit={vi.fn()} />);
+
+    await user.click(screen.getByRole("link", { name: /lanjutkan membaca/i }));
+
+    expect(browserOpenMock).toHaveBeenCalledWith({ url: "https://example.com/read/x" });
+    expect(startInAppReadingMock).not.toHaveBeenCalled();
+    expect(takeReadingSession()).toBe("droid");
+    isNativePlatformMock.mockReturnValue(false);
   });
 });
