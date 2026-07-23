@@ -9,6 +9,7 @@ import { ChapterUpdateForm } from "../components/ChapterUpdateForm";
 import {
   COMIC_UPDATED_EVENT,
   FLOATING_READER_SET_COMIC_EVENT,
+  closeReaderWindow,
   type FloatingReaderComicPayload,
 } from "../lib/floatingReader";
 
@@ -52,6 +53,8 @@ export function FloatingReader() {
     const main = await WebviewWindow.getByLabel("main");
     await main?.show();
     await main?.setFocus();
+    // "Kembali ke App" = selesai membaca → tutup window baca komik.
+    await closeReaderWindow();
   };
 
   const handleUpdate = async (latestChapter: number) => {
@@ -99,6 +102,11 @@ export function FloatingReader() {
         </button>
         <BackButton onClick={handleBackToApp} />
       </div>
+      <p className="mt-2 text-[10px] leading-tight text-slate-500">
+        <span className="font-semibold text-slate-400">Batasan fitur ini:</span> baca berlangsung di
+        window in-app dengan sesi browsing terpisah (tanpa login/cookie browser normal Anda), sebagian
+        situs bisa tampil berbeda, dan chapter tetap diisi manual.
+      </p>
     </div>
   );
 }

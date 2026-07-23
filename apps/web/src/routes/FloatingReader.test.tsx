@@ -60,18 +60,22 @@ describe("FloatingReader", () => {
     expect(screen.getByText("Data komik tidak lengkap.")).toBeInTheDocument();
   });
 
-  it("'Kembali ke App' focuses the main window without closing itself", async () => {
+  it("'Kembali ke App' focuses the main window and closes the reader window", async () => {
     const show = vi.fn().mockResolvedValue(undefined);
     const setFocus = vi.fn().mockResolvedValue(undefined);
-    getByLabelMock.mockResolvedValue({ show, setFocus });
+    const close = vi.fn().mockResolvedValue(undefined);
+    getByLabelMock.mockResolvedValue({ show, setFocus, close });
     const user = userEvent.setup();
     renderAt("comicId=1&title=One+Piece&latestChapter=1120");
 
     await user.click(screen.getByRole("button", { name: "Kembali ke App" }));
 
     expect(getByLabelMock).toHaveBeenCalledWith("main");
+    expect(getByLabelMock).toHaveBeenCalledWith("reader");
     expect(show).toHaveBeenCalledTimes(1);
     expect(setFocus).toHaveBeenCalledTimes(1);
+    // Reader window (baca komik in-app) ditutup saat kembali ke app.
+    expect(close).toHaveBeenCalledTimes(1);
   });
 
   it("'Update Chapter' opens the inline form, submits patchComic, and emits comic-updated", async () => {

@@ -4,7 +4,8 @@
   "description": "enables the default permissions",
   "windows": [
     "main",
-    "floating-reader"
+    "floating-reader",
+    "reader"
   ],
   "permissions": [
     "core:default",
@@ -14,6 +15,7 @@
     },
     "core:webview:allow-create-webview-window",
     "core:window:allow-set-focus",
-    "core:window:allow-show"
+    "core:window:allow-show",
+    "core:window:allow-close"
   ]
 }

@@ -8,6 +8,11 @@ import { getAuthToken } from "./storage";
  * session is realistically active at a time. */
 export const FLOATING_READER_LABEL = "floating-reader";
 
+/** Label untuk window webview yang menampilkan situs baca komik (read_url) DI
+ * DALAM app — navigasi top-level (bukan iframe) jadi X-Frame-Options/CSP
+ * frame-ancestors tidak berlaku, sama seperti membuka di browser sistem. */
+export const READER_LABEL = "reader";
+
 /** Event the companion window emits after a successful chapter update, so the
  * main window can merge it into its own `comics` state without a refetch. */
 export const COMIC_UPDATED_EVENT = "komik-tracker://comic-updated";
@@ -68,9 +73,45 @@ export async function openOrFocusFloatingReader(comic: Comic): Promise<void> {
     url: floatingReaderUrl(comic),
     title: "Sedang Membaca",
     width: 300,
-    height: 200,
+    height: 260,
     resizable: false,
     alwaysOnTop: true,
     focus: true,
   });
+}
+
+/**
+ * Membuka situs baca komik (`readUrl`) di window webview Tauri sendiri
+ * (maximized), bukan browser sistem — supaya user tidak keluar dari app.
+ * Kalau sudah ada window reader (komik hero berganti antar klik), tutup dulu
+ * lalu buat ulang: JS Tauri stabil tidak punya API navigate untuk mengubah URL
+ * window yang me-load halaman eksternal.
+ */
+export async function openReaderWindow(readUrl: string): Promise<void> {
+  const existing = await WebviewWindow.getByLabel(READER_LABEL);
+  if (existing) await existing.close();
+
+  new WebviewWindow(READER_LABEL, {
+    url: readUrl,
+    title: "Baca Komik",
+    maximized: true,
+    resizable: true,
+    focus: true,
+  });
+}
+
+/** Menutup window reader kalau terbuka (dipakai "Kembali ke App" di companion). */
+export async function closeReaderWindow(): Promise<void> {
+  const existing = await WebviewWindow.getByLabel(READER_LABEL);
+  if (existing) await existing.close();
+}
+
+/**
+ * Orkestrasi "Lanjutkan Membaca" di Tauri: buka window baca in-app, lalu buka
+ * companion always-on-top DI ATAS-nya (urutan penting — companion dibuat
+ * belakangan supaya alwaysOnTop menang di atas reader).
+ */
+export async function startInAppReading(comic: Comic, readUrl: string): Promise<void> {
+  await openReaderWindow(readUrl);
+  await openOrFocusFloatingReader(comic);
 }

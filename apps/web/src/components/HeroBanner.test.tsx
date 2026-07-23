@@ -5,6 +5,13 @@ import { HeroBanner } from "./HeroBanner";
 import type { Comic } from "../types/comic";
 import { takeReadingSession } from "../lib/readingSession";
 
+const { isTauriMock, startInAppReadingMock } = vi.hoisted(() => ({
+  isTauriMock: vi.fn(() => false),
+  startInAppReadingMock: vi.fn(() => Promise.resolve()),
+}));
+vi.mock("@tauri-apps/api/core", () => ({ isTauri: isTauriMock }));
+vi.mock("../lib/floatingReader", () => ({ startInAppReading: startInAppReadingMock }));
+
 function comic(overrides: Partial<Comic> = {}): Comic {
   return {
     comic_id: "id",
@@ -61,5 +68,20 @@ describe("HeroBanner", () => {
     await user.click(screen.getByRole("link", { name: /lanjutkan membaca/i }));
 
     expect(takeReadingSession()).toBe("abc");
+  });
+
+  it("di Tauri: baca in-app (startInAppReading) tanpa menandai sesi baca web", async () => {
+    isTauriMock.mockReturnValue(true);
+    startInAppReadingMock.mockClear();
+    const user = userEvent.setup();
+    const latest = comic({ comic_id: "xyz", read_url: "https://example.com/read/x" });
+    render(<HeroBanner comics={[latest]} onEdit={vi.fn()} />);
+
+    await user.click(screen.getByRole("link", { name: /lanjutkan membaca/i }));
+
+    expect(startInAppReadingMock).toHaveBeenCalledWith(latest, "https://example.com/read/x");
+    // Jalur web (markReadingStarted) TIDAK dipakai di Tauri.
+    expect(takeReadingSession()).toBeNull();
+    isTauriMock.mockReturnValue(false);
   });
 });
