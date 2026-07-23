@@ -16,5 +16,7 @@ module.exports = {
       "warn",
       { allowConstantExport: true },
     ],
+    // Izinkan pola strip field lewat rest destructuring (mis. buang `id` UI-only).
+    "@typescript-eslint/no-unused-vars": ["error", { ignoreRestSiblings: true }],
   },
 };

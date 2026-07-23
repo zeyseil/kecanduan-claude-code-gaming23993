@@ -6,7 +6,7 @@ describe("parseHistoris", () => {
     const { ok, failed } = parseHistoris("162. Judul komik(manga) : ch11");
     expect(failed).toEqual([]);
     expect(ok).toEqual([
-      { title: "Judul komik", type_tag: "manga", is_adult: false, latest_chapter: 11, status: "ongoing", note: null },
+      { id: expect.any(String), title: "Judul komik", type_tag: "manga", is_adult: false, latest_chapter: 11, status: "ongoing", note: null },
     ]);
   });
 
@@ -15,6 +15,7 @@ describe("parseHistoris", () => {
     expect(failed).toEqual([]);
     expect(ok).toHaveLength(1);
     expect(ok[0]).toEqual({
+      id: expect.any(String),
       title: "Judul lain",
       type_tag: "manhwa",
       is_adult: false,
@@ -34,6 +35,7 @@ describe("parseHistoris", () => {
     const { ok, failed } = parseHistoris("176.Judul(manga):ch38(completed)");
     expect(failed).toEqual([]);
     expect(ok[0]).toEqual({
+      id: expect.any(String),
       title: "Judul",
       type_tag: "manga",
       is_adult: false,
@@ -58,6 +60,7 @@ describe("parseHistoris", () => {
     const { ok, failed } = parseHistoris("Judul dewasa(manhwa18):ch5");
     expect(failed).toEqual([]);
     expect(ok[0]).toEqual({
+      id: expect.any(String),
       title: "Judul dewasa",
       type_tag: "manhwa",
       is_adult: true,
@@ -70,6 +73,7 @@ describe("parseHistoris", () => {
   it("konvensi 18+ manhwap/manhuap -> is_adult true (bug lama: p dibuang diam-diam)", () => {
     const { ok: okWa } = parseHistoris("Judul A(manhwap):ch1");
     expect(okWa[0]).toEqual({
+      id: expect.any(String),
       title: "Judul A",
       type_tag: "manhwa",
       is_adult: true,
@@ -80,6 +84,7 @@ describe("parseHistoris", () => {
 
     const { ok: okUa } = parseHistoris("Judul B(manhuap):ch1");
     expect(okUa[0]).toEqual({
+      id: expect.any(String),
       title: "Judul B",
       type_tag: "manhua",
       is_adult: true,
@@ -110,6 +115,7 @@ describe("parseHistoris", () => {
     expect(failed).toEqual([]);
     expect(ok).toHaveLength(1);
     expect(ok[0]).toEqual({
+      id: expect.any(String),
       title: "Solo Leveling",
       type_tag: null,
       is_adult: false,
@@ -117,6 +123,15 @@ describe("parseHistoris", () => {
       status: "ongoing",
       note: null,
     });
+  });
+
+  it("tiap entri punya id yang unik (untuk key & edit judul di preview)", () => {
+    // Sengaja pakai judul yang sama dua kali — id harus tetap unik.
+    const { ok } = parseHistoris("Solo Leveling(manhwa):ch1\nSolo Leveling(manhwa):ch2");
+    expect(ok).toHaveLength(2);
+    expect(ok[0].id).toBeTruthy();
+    expect(ok[1].id).toBeTruthy();
+    expect(ok[0].id).not.toBe(ok[1].id);
   });
 
   it("baris kosong diabaikan, bukan dianggap gagal", () => {

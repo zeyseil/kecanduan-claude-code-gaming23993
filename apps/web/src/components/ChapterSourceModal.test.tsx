@@ -15,13 +15,13 @@ beforeEach(() => fetchMock.mockReset());
 
 describe("ChapterSourceModal", () => {
   it("menampilkan semua layanan", () => {
-    render(<ChapterSourceModal comicId="1" comicTitle="Solo Leveling" onResult={vi.fn()} onClose={vi.fn()} />);
+    render(<ChapterSourceModal title="Solo Leveling" afterChapter={200} onResult={vi.fn()} onClose={vi.fn()} />);
     expect(screen.getByRole("button", { name: "comick.dev" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "MangaDex" })).toBeInTheDocument();
   });
 
   it("menampilkan judul comic sebagai konteks di header", () => {
-    render(<ChapterSourceModal comicId="1" comicTitle="Solo Leveling" onResult={vi.fn()} onClose={vi.fn()} />);
+    render(<ChapterSourceModal title="Solo Leveling" afterChapter={200} onResult={vi.fn()} onClose={vi.fn()} />);
     expect(screen.getByText("untuk: Solo Leveling")).toBeInTheDocument();
   });
 
@@ -29,11 +29,11 @@ describe("ChapterSourceModal", () => {
     const user = userEvent.setup();
     const onResult = vi.fn();
     fetchMock.mockResolvedValue({ read_url: "https://mangadex.org/chapter/x" });
-    render(<ChapterSourceModal comicId="1" comicTitle="Solo Leveling" onResult={onResult} onClose={vi.fn()} />);
+    render(<ChapterSourceModal title="Solo Leveling" afterChapter={200} onResult={onResult} onClose={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: "MangaDex" }));
 
-    expect(fetchMock).toHaveBeenCalledWith("1", "mangadex");
+    expect(fetchMock).toHaveBeenCalledWith("Solo Leveling", 200, "mangadex");
     await vi.waitFor(() =>
       expect(onResult).toHaveBeenCalledWith("https://mangadex.org/chapter/x"),
     );
@@ -42,7 +42,7 @@ describe("ChapterSourceModal", () => {
   it("menampilkan reason saat tidak ditemukan", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValue({ read_url: null, reason: "Komik tidak ditemukan di comick.dev" });
-    render(<ChapterSourceModal comicId="1" comicTitle="Solo Leveling" onResult={vi.fn()} onClose={vi.fn()} />);
+    render(<ChapterSourceModal title="Solo Leveling" afterChapter={200} onResult={vi.fn()} onClose={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: "comick.dev" }));
 

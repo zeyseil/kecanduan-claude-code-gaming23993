@@ -11,6 +11,10 @@ import type { Status, TypeTag } from "../types/comic";
 import { STATUSES, TYPE_TAGS } from "../types/comic";
 
 export interface ParsedEntry {
+  /** Id stabil per-entri (unik dalam satu hasil parse). Dipakai sebagai React
+   * key dan target edit judul di preview — judul bisa diedit/duplikat, jadi
+   * TIDAK boleh di-key oleh judul. */
+  id: string;
   title: string;
   /** null artinya "jenis tidak ditulis user" — perlu deteksi otomatis via MangaDex/comick/AniList/Komiku. */
   type_tag: TypeTag | null;
@@ -121,7 +125,7 @@ function combineNotes(...notes: Array<string | null>): string | null {
   return parts.length > 0 ? parts.join("; ") : null;
 }
 
-function parseLine(raw: string): ParsedEntry | string {
+function parseLine(raw: string): Omit<ParsedEntry, "id"> | string {
   // Nomor urut di depan bukan id permanen — dibuang (SPEC.md §7).
   const withoutIndex = raw.trim().replace(/^\d+\s*\.\s*/, "");
 
@@ -207,7 +211,8 @@ export function parseHistoris(text: string): ParseResult {
     if (typeof parsed === "string") {
       failed.push({ line: index + 1, raw: raw.trim(), reason: parsed });
     } else {
-      ok.push(parsed);
+      // Id berbasis nomor baris asli — unik & stabil dalam satu hasil parse.
+      ok.push({ id: `entry-${index}`, ...parsed });
     }
   });
 

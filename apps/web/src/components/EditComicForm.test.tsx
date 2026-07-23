@@ -245,7 +245,7 @@ describe("EditComicForm", () => {
     // Modal muncul dengan pilihan layanan.
     await user.click(screen.getByRole("button", { name: "comick.dev" }));
 
-    expect(fetchNextChapterReadUrlMock).toHaveBeenCalledWith(COMIC.comic_id, "comick");
+    expect(fetchNextChapterReadUrlMock).toHaveBeenCalledWith("One Piece", 1120, "comick");
     expect(await screen.findByLabelText(/link baca/i)).toHaveValue(
       "https://comick.dev/comic/one-piece/abc-chapter-1121-en",
     );
@@ -262,7 +262,7 @@ describe("EditComicForm", () => {
     await user.click(screen.getByRole("button", { name: /cari link chapter berikutnya/i }));
     await user.click(screen.getByRole("button", { name: "MangaDex" }));
 
-    expect(fetchNextChapterReadUrlMock).toHaveBeenCalledWith(COMIC.comic_id, "mangadex");
+    expect(fetchNextChapterReadUrlMock).toHaveBeenCalledWith("One Piece", 1120, "mangadex");
     expect(await screen.findByLabelText(/link baca/i)).toHaveValue("https://mangadex.org/chapter/xyz");
   });
 

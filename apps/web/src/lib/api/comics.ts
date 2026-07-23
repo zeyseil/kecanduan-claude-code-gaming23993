@@ -105,7 +105,9 @@ export interface BulkImportResultItem {
 }
 
 /** Deterministic import from parsed historical data — no AI involved. */
-export async function bulkImportComics(entries: ParsedEntry[]): Promise<BulkImportResultItem[]> {
+// `id` di ParsedEntry murni UI-only (React key / edit judul di preview) dan
+// tidak dikirim ke Worker — caller sudah membuangnya.
+export async function bulkImportComics(entries: Omit<ParsedEntry, "id">[]): Promise<BulkImportResultItem[]> {
   const res = await apiFetch(`${BASE_URL}/comics/bulk`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -174,17 +176,20 @@ export const CHAPTER_SOURCES = [
 
 export type ChapterSourceId = (typeof CHAPTER_SOURCES)[number]["id"];
 
-/** "Cari link chapter berikutnya" — looks up the chapter right after this
- * comic's stored latest_chapter on the chosen source. Never auto-saves; caller
- * fills its own form state and the user still clicks Simpan. */
+/** "Cari link chapter berikutnya" — looks up the chapter right after the given
+ * latest_chapter for the given title on the chosen source. Judul & chapter
+ * diambil dari state form saat itu (belum disimpan), jadi ganti nama/chapter
+ * lalu langsung cari tanpa Simpan dulu. Never auto-saves; caller fills its own
+ * form state and the user still clicks Simpan. */
 export async function fetchNextChapterReadUrl(
-  comicId: string,
+  title: string,
+  afterChapter: number,
   source: ChapterSourceId = "comick",
 ): Promise<FetchReadUrlResult> {
   const res = await apiFetch(`${BASE_URL}/comics/fetch-read-url`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ comic_id: comicId, source }),
+    body: JSON.stringify({ title, after_chapter: afterChapter, source }),
   });
   const body = (await res.json().catch(() => null)) as (FetchReadUrlResult & { error?: string }) | null;
   if (!res.ok && !body?.reason) {

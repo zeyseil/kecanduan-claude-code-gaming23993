@@ -6,9 +6,10 @@ import {
 } from "../lib/api/comics";
 
 interface ChapterSourceModalProps {
-  comicId: string;
-  /** Judul comic yang sedang di-edit — ditampilkan sebagai konteks di header panel, terutama penting di layar sempit tempat panel ini menutup total form Edit di belakangnya. */
-  comicTitle: string;
+  /** Judul dari state form Edit saat itu (belum disimpan) — dipakai sebagai query pencarian DAN ditampilkan sebagai konteks di header panel. */
+  title: string;
+  /** Chapter terakhir dari state form Edit saat itu (belum disimpan) — pencarian mencari chapter setelah angka ini. */
+  afterChapter: number;
   /** Dipanggil dengan read_url hasil pencarian — pemanggil mengisi field-nya sendiri. */
   onResult: (readUrl: string) => void;
   onClose: () => void;
@@ -20,8 +21,8 @@ interface ChapterSourceModalProps {
  * satu layanan; hasilnya diisikan lewat onResult, TIDAK auto-simpan.
  */
 export function ChapterSourceModal({
-  comicId,
-  comicTitle,
+  title,
+  afterChapter,
   onResult,
   onClose,
 }: ChapterSourceModalProps) {
@@ -32,7 +33,7 @@ export function ChapterSourceModal({
     setError(null);
     setPending(source);
     try {
-      const result = await fetchNextChapterReadUrl(comicId, source);
+      const result = await fetchNextChapterReadUrl(title, afterChapter, source);
       if (result.read_url) {
         onResult(result.read_url);
       } else {
@@ -50,8 +51,8 @@ export function ChapterSourceModal({
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold text-slate-100">Pilih layanan</h3>
-          <p className="truncate text-xs text-slate-400" title={comicTitle}>
-            untuk: {comicTitle}
+          <p className="truncate text-xs text-slate-400" title={title}>
+            untuk: {title}
           </p>
         </div>
         <button
@@ -88,8 +89,8 @@ export function ChapterSourceModal({
       <p className="mt-3 text-xs text-slate-500">
         <strong className="text-slate-400">Batasan fitur ini:</strong> comick.dev &amp; MangaDex
         mencari chapter bahasa Inggris; Shinigami, Komiku, dan Kiryuu (semua ID) bahasa Indonesia.
-        Pencarian berdasarkan Chapter Terakhir Dibaca yang SUDAH TERSIMPAN (Simpan dulu kalau baru
-        mengubah angkanya). MangaDex sering tidak punya chapter untuk judul populer yang sudah
+        Pencarian berdasarkan judul &amp; chapter yang sedang diisi di form Edit saat ini (tidak
+        perlu Simpan dulu). MangaDex sering tidak punya chapter untuk judul populer yang sudah
         berlisensi resmi — coba comick.dev atau sumber ID. Komiku butuh instance yang di-deploy
         sendiri (KOMIKU_API_URL) — bisa tidak tersedia kalau belum dikonfigurasi. Kiryuu dibaca
         langsung dari halaman situsnya (bukan API resmi) sehingga paling rentan berhenti bekerja

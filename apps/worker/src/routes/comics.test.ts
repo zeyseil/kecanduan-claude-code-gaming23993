@@ -888,6 +888,42 @@ describe("/comics", () => {
       vi.unstubAllGlobals();
     });
 
+    it("uses title+after_chapter from the request without a store lookup", async () => {
+      // Sengaja TIDAK bikin comic — jalur utama tidak menyentuh store sama sekali.
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          const u = String(url);
+          if (u.includes("/v1.0/search/")) {
+            return new Response(
+              JSON.stringify([
+                { hid: "71gMd0vF", slug: "00-solo-leveling", title: "Solo Leveling", country: "kr", md_titles: [], md_covers: [] },
+              ]),
+              { status: 200 },
+            );
+          }
+          if (u.includes("/chapters")) {
+            return new Response(
+              JSON.stringify({ chapters: [{ hid: "bbb", chap: "201", lang: "en" }, { hid: "ccc", chap: "200", lang: "en" }] }),
+              { status: 200 },
+            );
+          }
+          return new Response("not found", { status: 404 });
+        }),
+      );
+
+      const res = await request("/comics/fetch-read-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Solo Leveling", after_chapter: 200 }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { read_url: string | null };
+      expect(body.read_url).toBe("https://comick.dev/comic/00-solo-leveling/bbb-chapter-201-en");
+
+      vi.unstubAllGlobals();
+    });
+
     it("returns a reason without writing anything when comick has no next chapter", async () => {
       const createRes = await request("/comics", {
         method: "POST",

@@ -221,7 +221,45 @@ describe("BulkImportPanel", () => {
 
     // Masih 0 siap import — tidak ada tebakan yang tersimpan.
     expect(await screen.findByText(/0 siap import/i)).toBeInTheDocument();
-    expect(screen.getByText(/jenis tidak terdeteksi/i)).toBeInTheDocument();
+    // Reason asli dari server ditampilkan inline di baris yang gagal.
+    expect(screen.getByText(/tidak ditemukan di MangaDex/i)).toBeInTheDocument();
+  });
+
+  it("betulkan nama entri lalu deteksi ulang per-baris mengisi type_tag, dan judul yang dibetulkan ikut ke import", async () => {
+    // Judul asli tidak cocok; nama kanonik yang dibetulkan berhasil dideteksi.
+    detectTypesMock.mockResolvedValue([{ title: "Solo Leveling", type_tag: "manhwa" }]);
+    bulkImportComicsMock.mockResolvedValue([{ title: "Solo Leveling", action: "created", comic_id: "c-1" }]);
+    const user = userEvent.setup();
+    render(<BulkImportPanel />);
+
+    await user.type(screen.getByLabelText(/teks data historis/i), "Sol Lvl:ch179");
+    await user.click(screen.getByRole("button", { name: /import data/i }));
+
+    // Baris muncul sebagai input editable.
+    const nameInput = await screen.findByLabelText(/nama komik baris ch179/i);
+    expect(nameInput).toHaveValue("Sol Lvl");
+    await user.clear(nameInput);
+    await user.type(nameInput, "Solo Leveling");
+
+    // Tombol Deteksi per-baris (bukan "Deteksi jenis otomatis").
+    await user.click(screen.getByRole("button", { name: /^deteksi$/i }));
+
+    expect(detectTypesMock).toHaveBeenCalledWith(["Solo Leveling"]);
+    expect(await screen.findByText(/1 siap import, 0 perlu deteksi jenis/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /import 1 entri/i }));
+    expect(bulkImportComicsMock).toHaveBeenCalledWith([
+      {
+        title: "Solo Leveling",
+        type_tag: "manhwa",
+        is_adult: false,
+        latest_chapter: 179,
+        status: "ongoing",
+        note: null,
+        cover_url: null,
+        source_api: null,
+      },
+    ]);
   });
 
   it("tombol Default (RAW) mengisi textarea dengan contoh", async () => {
