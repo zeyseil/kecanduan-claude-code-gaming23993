@@ -697,17 +697,27 @@ Slice ketiga puluh dua (branch `feat/komiku-kiryuu-chapter-sources`, base `main`
 - Total test: `pnpm --filter worker test` → **226 hijau** (+20: `komikuChapters.test.ts` 6, `kiryuu.test.ts` 6, `kiryuuChapters.test.ts` 6, dispatch `komiku`/`kiryuu` di `chapterSources.test.ts`). `pnpm --filter web test` tidak berubah jumlahnya (mirror registry murni data) — tetap **255 hijau**. Lint+build bersih kedua app.
 - **Diverifikasi live 2 kali** (saat planning DAN setelah kode ditulis, sebelum commit): `komiku-rest-api-five.vercel.app/detail-komik/solo-leveling-id` (field `chapters[].chapterNumber`/`originalLink` cocok persis), dan `v7.kiryuu.to` nonce+search AJAX (nonce `<input name='search_nonce'>`, hasil `<a href>...<h3>` cocok persis kode parser). Wiring end-to-end (registry, dispatch, rate-limit, UI) dikunci suite otomatis. **Pola URL chapter Kiryuu belum diverifikasi dengan membuka link sungguhan di browser** (hanya dicek `href` yang muncul di HTML — bukan hasil klik nyata) — langkah manual wajib sebelum menganggap ini benar-benar selesai, lihat "Verifikasi Manual — Sumber Chapter Komiku + Kiryuu" di bawah.
 - Scope sengaja dibatasi ke sumber chapter saja — Komiku/Kiryuu TIDAK ditambahkan sebagai sumber baru di rantai fetch cover/type (`comicInfo.ts`); Komiku sudah ada di rantai itu sejak slice 24 (tidak berubah).
-- **Prasyarat deploy**: sama seperti slice 30/31 — `POST /comics/fetch-read-url` versi ini (`source: "komiku"|"kiryuu"`) harus `wrangler deploy` ke production dulu sebelum dipakai dari `tauri:dev`/produksi.
+- **Deploy (susulan, sesi sama, atas permintaan eksplisit user):** `wrangler deploy` (Worker) dan `wrangler pages deploy apps/web/dist --project-name komik-tracker --branch main` (web, build dengan `VITE_WORKER_URL` production) sudah dijalankan — `POST /comics/fetch-read-url` dengan `source: "komiku"|"kiryuu"` sudah live di `https://komik-tracker-worker.sulthon-rasyidin.workers.dev` (dikonfirmasi 401 bukan 404), web app ter-update di `https://komik-tracker.pages.dev`. **Catatan proses**: deploy Pages pertama tanpa `--branch main` mendarat ke alias preview (karena branch git lokal saat itu adalah `feat/komiku-kiryuu-chapter-sources`, bukan `main`) — bukan ke domain production; diulang dengan `--branch main` eksplisit untuk menimpa alias production yang benar.
 
 ## Verifikasi Manual — Sumber Chapter Komiku + Kiryuu (Slice ketiga puluh dua)
-1. `pnpm --filter worker test` → 226 hijau, `pnpm --filter web test` → 255 hijau. Lint + build bersih kedua app.
-2. Deploy Worker dulu (`wrangler deploy`) kalau mau tes lewat `tauri:dev`/produksi — endpoint `fetch-read-url` versi ini (menerima `source: "komiku"|"kiryuu"`) harus ada di sana. `KOMIKU_API_URL` yang sudah ada dipakai lagi (tidak perlu env baru); `KIRYUU_API_URL` opsional (kosong = default `v7.kiryuu.to`).
-3. Edit komik manga yang ADA di Komiku (mis. "Solo Leveling") → "Cari link chapter berikutnya" → modal sekarang punya 5 opsi termasuk **Komiku (ID)** → pilih → `Link Baca` terisi `https://komiku.org/...` untuk chapter setelah `latest_chapter` saat ini.
-4. Edit komik yang ADA di Kiryuu (mis. "Solo Leveling", "Martial Peak") → pilih **Kiryuu (ID)** → `Link Baca` terisi `https://v7.kiryuu.to/manga/.../chapter-N.../`.
-5. **Langkah paling penting**: buka link Kiryuu itu di browser sungguhan → pastikan chapter yang benar terbuka (bukan 404/chapter salah). Ini belum diverifikasi otomatis (frontend Kiryuu tidak dites lewat klik nyata saat implementasi).
-6. Komik yang tidak ada di salah satu sumber → pesan reason jelas ("Komik tidak ditemukan di Komiku/Kiryuu"), link tidak berubah, tidak crash.
-7. Cek blok "Batasan fitur ini" di modal menyebut kelima sumber dengan benar (bahasa + catatan self-host Komiku + catatan kerapuhan Kiryuu).
-8. Simpan hasil → cek tersimpan di Astra. Kembalikan `read_url` ke nilai semula setelah verifikasi.
+
+**Status deploy (per sesi susulan):** Worker sudah di-deploy (`https://komik-tracker-worker.sulthon-rasyidin.workers.dev`, dikonfirmasi lewat `curl -X POST .../comics/fetch-read-url -d '{"comic_id":"x","source":"kiryuu"}'` → `401` bukan `404`, artinya route sudah ada di production). Web app sudah di-deploy ke production Pages (`https://komik-tracker.pages.dev`, build dengan `VITE_WORKER_URL` production ter-bake, dikonfirmasi via `grep` bundle JS). Langkah 1 di bawah sudah otomatis; mulai dari langkah 2 kalau hanya ingin re-test manual.
+
+1. **(Sudah dilakukan Claude)** `pnpm --filter worker test` → 226 hijau. `pnpm --filter web test` → 255 hijau. `pnpm --filter worker lint`, `pnpm --filter worker build`, `pnpm --filter web lint`, `pnpm --filter web build` → semua bersih. `wrangler deploy` (Worker) dan `wrangler pages deploy apps/web/dist --project-name komik-tracker --branch main` (web) sudah dijalankan.
+2. Buka browser ke `https://komik-tracker.pages.dev`. Kalau diarahkan ke halaman `/login`, masukkan token Anda di field **TOKEN** lalu klik tombol **Masuk**.
+3. Di halaman Daftar Komik, klik salah satu card komik yang berjudul **"Solo Leveling"** (kalau tidak ada di daftar Anda, tambahkan dulu lewat "+ Tambah Komik" dengan judul persis itu, chapter berapa saja, lalu lanjut ke langkah berikut menggunakan komik itu).
+4. Setelah card ter-spotlight (bercahaya), klik ikon pensil kecil di pojok kanan-bawah cover untuk membuka modal **Edit Komik**.
+5. Di dalam modal Edit, cari tombol berlabel **"Cari link chapter berikutnya"** (ada di dekat field "Link Baca") dan klik.
+6. Panel pemilih sumber akan muncul di sebelah modal Edit, berisi 5 tombol: `comick.dev`, `MangaDex`, `Shinigami (ID)`, `Komiku (ID)`, `Kiryuu (ID)`. Klik tombol **`Komiku (ID)`**.
+7. **Hasil yang diharapkan**: field **"Link Baca"** di modal Edit terisi otomatis dengan URL berformat `https://komiku.org/solo-leveling-chapter-{angka}/` (angka = chapter setelah "Chapter Terakhir Dibaca" komik itu saat ini). Kalau muncul pesan error di panel (bukan URL) — catat pesannya, itu bug (Komiku seharusnya punya "Solo Leveling").
+8. Klik tombol **"Cari link chapter berikutnya"** lagi (field akan diisi ulang), lalu klik tombol **`Kiryuu (ID)`** di panel yang muncul.
+9. **Hasil yang diharapkan**: field **"Link Baca"** terisi URL berformat `https://v7.kiryuu.to/manga/solo-leveling/chapter-{angka}.../`.
+10. **Langkah paling kritis (belum pernah diverifikasi dengan klik nyata)**: salin URL dari field "Link Baca" hasil langkah 9, buka di tab browser baru. **Yang harus terjadi**: halaman chapter Kiryuu yang benar terbuka (gambar chapter komik Solo Leveling dengan nomor chapter yang sesuai di judul halaman). **Yang TIDAK boleh terjadi**: halaman 404, halaman error Kiryuu, atau chapter komik yang salah.
+    - Kalau langkah ini gagal (404/salah): laporkan URL persis yang gagal itu. Perbaikannya ada di fungsi `readerUrl`-equivalent (pola parsing href) di `apps/worker/src/lib/kiryuuChapters.ts` — kemungkinan pola URL Kiryuu sudah berubah sejak kode ini ditulis.
+11. Klik tombol **Batal** (tutup modal Edit tanpa menyimpan) — supaya "Link Baca" komik "Solo Leveling" Anda tidak berubah permanen dari hasil percobaan ini.
+12. **Uji kasus "tidak ditemukan"**: buka modal Edit komik apa pun, klik "Cari link chapter berikutnya" → `Komiku (ID)`, tapi kali ini pada komik dengan judul yang jelas tidak nyata (mis. buat komik dummy berjudul **"Zzzznotarealcomictitle123"**, chapter 1). **Hasil yang diharapkan**: pesan error persis **"Komik tidak ditemukan di Komiku"** muncul di panel (bukan crash, bukan field kosong tanpa pesan). Ulangi untuk `Kiryuu (ID)` → pesan **"Komik tidak ditemukan di Kiryuu"**. Hapus komik dummy ini setelah selesai (tombol "Hapus" di modal Edit → konfirmasi "Ya, hapus").
+13. Cek teks di bagian bawah panel pemilih sumber (mulai "Batasan fitur ini:") — pastikan menyebut: comick.dev/MangaDex = Inggris; Shinigami/Komiku/Kiryuu = Indonesia; Komiku butuh instance self-host; Kiryuu dibaca dari HTML mentah (bukan API resmi, paling rentan berhenti bekerja).
+14. Kalau semua langkah di atas lulus tanpa hasil tak terduga: konfirmasi ke saya bagian mana yang lulus dan mana yang tidak (terutama langkah 10) supaya catatan "belum diverifikasi" di riwayat slice ini bisa diperbarui jadi "sudah diverifikasi".
 
 ## Verifikasi Manual — Sumber Chapter Shinigami (Slice ketiga puluh satu)
 1. `pnpm --filter worker test` → 206 hijau, `pnpm --filter web test` → 255 hijau. Lint + build bersih kedua app.
@@ -790,6 +800,12 @@ Harus nyaman di HP, tablet, laptop. Desain mobile-first.
    Tunggu saya setujui rencananya.
 - Setelah selesai, beri tahu saya **cara memverifikasinya secara manual** —
    langkah konkret, bukan "silakan dicoba" jika memerlukan verifikasi secara manual oleh user, selain itu otomatis.
+   **Setiap langkah harus eksplisit dan bisa diikuti tanpa menebak**: sebutkan
+   URL/endpoint persis, perintah persis (siap copy-paste), tombol/elemen UI
+   yang diklik dengan nama persisnya, input contoh yang konkret (bukan
+   "masukkan judul apa saja"), dan hasil yang diharapkan secara spesifik
+   (bukan "harus berhasil" — sebutkan apa yang seharusnya muncul/berubah).
+   Format checklist bernomor, satu aksi dapat diverifikasi per butir.
 - Kalau saya tanya kenapa kamu menulis sesuatu, jelaskan sejujurnya. Termasuk
    kalau itu pilihan yang lemah.
 - **Setiap fitur baru wajib menampilkan batasannya di UI** (blok catatan permanen
