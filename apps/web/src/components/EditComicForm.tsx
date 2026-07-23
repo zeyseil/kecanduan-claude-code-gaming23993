@@ -314,6 +314,7 @@ export function EditComicForm({ comic, onSubmit, onDelete, onCancel }: EditComic
           <div className="lg:absolute lg:left-1/2 lg:ml-[15rem]">
             <ChapterSourceModal
               comicId={comic.comic_id}
+              comicTitle={comic.title}
               onResult={(url) => {
                 setReadUrl(url);
                 setShowSourceModal(false);

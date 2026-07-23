@@ -430,7 +430,7 @@ export function DaftarKomik() {
 
       {showAddForm && (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-md rounded-lg bg-slate-800 p-4">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-slate-800 p-4">
             <h2 className="mb-3 text-base font-semibold text-slate-100">
               Tambah Komik
             </h2>
@@ -455,7 +455,7 @@ export function DaftarKomik() {
 
       {editingComic && (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-md rounded-lg bg-slate-800 p-4">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-slate-800 p-4">
             <h2 className="mb-3 text-base font-semibold text-slate-100">
               Edit Komik — {editingComic.title}
             </h2>

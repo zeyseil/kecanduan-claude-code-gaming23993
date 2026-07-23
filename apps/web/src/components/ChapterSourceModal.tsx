@@ -7,6 +7,8 @@ import {
 
 interface ChapterSourceModalProps {
   comicId: string;
+  /** Judul comic yang sedang di-edit — ditampilkan sebagai konteks di header panel, terutama penting di layar sempit tempat panel ini menutup total form Edit di belakangnya. */
+  comicTitle: string;
   /** Dipanggil dengan read_url hasil pencarian — pemanggil mengisi field-nya sendiri. */
   onResult: (readUrl: string) => void;
   onClose: () => void;
@@ -17,7 +19,12 @@ interface ChapterSourceModalProps {
  * modal Edit (flanking di layar lebar, menumpuk di layar kecil). User memilih
  * satu layanan; hasilnya diisikan lewat onResult, TIDAK auto-simpan.
  */
-export function ChapterSourceModal({ comicId, onResult, onClose }: ChapterSourceModalProps) {
+export function ChapterSourceModal({
+  comicId,
+  comicTitle,
+  onResult,
+  onClose,
+}: ChapterSourceModalProps) {
   const [pending, setPending] = useState<ChapterSourceId | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,13 +47,18 @@ export function ChapterSourceModal({ comicId, onResult, onClose }: ChapterSource
 
   return (
     <div className="w-full max-w-xs rounded-lg bg-slate-800 p-4 shadow-xl">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-100">Pilih layanan</h3>
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-100">Pilih layanan</h3>
+          <p className="truncate text-xs text-slate-400" title={comicTitle}>
+            untuk: {comicTitle}
+          </p>
+        </div>
         <button
           type="button"
           onClick={onClose}
           disabled={pending !== null}
-          className="rounded px-2 py-0.5 text-sm text-slate-400 hover:bg-slate-700 hover:text-slate-200 disabled:opacity-50"
+          className="shrink-0 rounded px-2 py-0.5 text-sm text-slate-400 hover:bg-slate-700 hover:text-slate-200 disabled:opacity-50"
           aria-label="Tutup"
         >
           ✕

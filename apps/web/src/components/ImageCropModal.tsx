@@ -35,7 +35,7 @@ export function ImageCropModal({
 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4">
-      <div className="flex w-full max-w-md flex-col gap-3 rounded-lg bg-slate-800 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-lg bg-slate-800 p-4">
         <h3 className="text-sm font-semibold text-slate-100">
           Sesuaikan Cover
         </h3>
