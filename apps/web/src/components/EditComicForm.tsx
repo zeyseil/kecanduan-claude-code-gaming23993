@@ -309,9 +309,15 @@ export function EditComicForm({ comic, onSubmit, onDelete, onCancel }: EditComic
       </form>
 
       {showSourceModal && (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4">
+        <div
+          className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowSourceModal(false)}
+        >
           {/* Beside the centered Edit modal on lg (flanking to its right); stacked/centered on smaller screens. */}
-          <div className="lg:absolute lg:left-1/2 lg:ml-[15rem]">
+          <div
+            className="lg:absolute lg:left-1/2 lg:ml-[15rem]"
+            onClick={(e) => e.stopPropagation()}
+          >
             <ChapterSourceModal
               title={title}
               afterChapter={Number(chapter) || comic.latest_chapter}
