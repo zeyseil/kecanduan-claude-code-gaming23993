@@ -193,7 +193,13 @@ export function ComicCard({
         )}
 
         {isPressed && onRead && comic.read_url && !censored && (
-          <div className="absolute inset-0 flex items-center justify-center">
+          // pointer-events-none di wrapper: div inset-0 ini menutupi seluruh
+          // cover termasuk tombol status/edit di pojok bawah (di-render lebih
+          // dulu, jadi tertumpuk oleh div ini) — tanpa pointer-events-none, div
+          // ini menangkap semua klik di area itu meski tidak punya handler
+          // sendiri. pointer-events-auto di tombol membalikkannya lagi supaya
+          // tombol Baca sendiri tetap bisa diklik.
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <button
               type="button"
               aria-label={`Baca ${comic.title}`}
@@ -201,7 +207,7 @@ export function ComicCard({
                 e.stopPropagation();
                 onRead(comic);
               }}
-              className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600/95 px-4 py-2 text-sm font-semibold text-white shadow-lg hover:bg-indigo-500"
+              className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-indigo-600/95 px-4 py-2 text-sm font-semibold text-white shadow-lg hover:bg-indigo-500"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
