@@ -6,10 +6,12 @@
 import type { Env } from "../env";
 import { findNextChapterUrl, type NextChapterResult } from "./comickChapters";
 import { findNextChapterUrlMangaDex } from "./mangadexChapters";
+import { findNextChapterUrlShinigami } from "./shinigamiChapters";
 
 export const CHAPTER_SOURCES = [
   { id: "comick", label: "comick.dev" },
   { id: "mangadex", label: "MangaDex" },
+  { id: "shinigami", label: "Shinigami (ID)" },
 ] as const;
 
 export type ChapterSourceId = (typeof CHAPTER_SOURCES)[number]["id"];
@@ -29,6 +31,8 @@ export function resolveNextChapter(
   switch (source) {
     case "mangadex":
       return findNextChapterUrlMangaDex(title, afterChapter, env);
+    case "shinigami":
+      return findNextChapterUrlShinigami(title, afterChapter, env);
     case "comick":
     default:
       return findNextChapterUrl(title, afterChapter, env);

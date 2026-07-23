@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
 import type { Env } from "../env";
 import { fetchComickInfo } from "./comick";
 
@@ -6,7 +6,7 @@ import { fetchComickInfo } from "./comick";
 const env = {} as Env;
 
 function stub(response: unknown, status = 200) {
-  const fn = vi.fn(async () => new Response(JSON.stringify(response), { status }));
+  const fn: Mock<typeof fetch> = vi.fn(async () => new Response(JSON.stringify(response), { status }));
   vi.stubGlobal("fetch", fn);
   return fn;
 }

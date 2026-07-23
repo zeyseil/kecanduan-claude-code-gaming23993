@@ -80,3 +80,9 @@ export async function acquireComickSlot(namespace: DurableObjectNamespace): Prom
 export async function acquireKomikuSlot(namespace: DurableObjectNamespace): Promise<void> {
   await acquireSlot(namespace, "komiku", 2, 1);
 }
+
+/** Shinigami (api.shngm.io) — open public JSON API; moderate budget, kept a
+ * touch gentler than MangaDex to stay a polite guest. */
+export async function acquireShinigamiSlot(namespace: DurableObjectNamespace): Promise<void> {
+  await acquireSlot(namespace, "shinigami", 5, 3);
+}

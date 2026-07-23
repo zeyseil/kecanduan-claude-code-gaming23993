@@ -74,11 +74,12 @@ export function ChapterSourceModal({ comicId, onResult, onClose }: ChapterSource
       </div>
 
       <p className="mt-3 text-xs text-slate-500">
-        <strong className="text-slate-400">Batasan fitur ini:</strong> hanya mencari chapter bahasa
-        Inggris, berdasarkan Chapter Terakhir Dibaca yang SUDAH TERSIMPAN (Simpan dulu kalau baru
-        mengubah angkanya). MangaDex sering tidak punya chapter untuk judul populer yang sudah
-        berlisensi resmi — coba comick.dev. Katalog sangat panjang mungkin tidak ketemu; isi manual
-        kalau begitu.
+        <strong className="text-slate-400">Batasan fitur ini:</strong> comick.dev &amp; MangaDex
+        mencari chapter bahasa Inggris; Shinigami (ID) bahasa Indonesia. Pencarian berdasarkan
+        Chapter Terakhir Dibaca yang SUDAH TERSIMPAN (Simpan dulu kalau baru mengubah angkanya).
+        MangaDex sering tidak punya chapter untuk judul populer yang sudah berlisensi resmi — coba
+        comick.dev atau Shinigami. Tiap sumber hanya menemukan judul yang ADA di katalognya; katalog
+        sangat panjang mungkin tidak ketemu — isi manual kalau begitu.
       </p>
     </div>
   );
