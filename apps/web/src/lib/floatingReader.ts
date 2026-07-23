@@ -1,4 +1,5 @@
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { emit } from "@tauri-apps/api/event";
 import type { Comic } from "../types/comic";
 import { getAuthToken } from "./storage";
@@ -107,11 +108,16 @@ export async function closeReaderWindow(): Promise<void> {
 }
 
 /**
- * Orkestrasi "Lanjutkan Membaca" di Tauri: buka window baca in-app, lalu buka
+ * Orkestrasi "Lanjutkan Membaca" di Tauri: sembunyikan window `main` ke system
+ * tray (BUKAN navigasi/tutup — state React tetap hidup, `show()` nanti
+ * mengembalikannya persis semula), lalu buka window baca in-app, lalu buka
  * companion always-on-top DI ATAS-nya (urutan penting — companion dibuat
- * belakangan supaya alwaysOnTop menang di atas reader).
+ * belakangan supaya alwaysOnTop menang di atas reader). Ikon tray (dibuat
+ * sekali di lib.rs, selalu ada) jadi jaring pengaman kalau user menutup
+ * reader/companion lewat tombol X biasa alih-alih "Kembali ke App".
  */
 export async function startInAppReading(comic: Comic, readUrl: string): Promise<void> {
+  await getCurrentWindow().hide();
   await openReaderWindow(readUrl);
   await openOrFocusFloatingReader(comic);
 }

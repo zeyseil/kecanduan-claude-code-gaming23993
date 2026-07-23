@@ -1,11 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { Comic } from "../types/comic";
 
-const { getByLabelMock, webviewWindowCtorMock, emitMock, getAuthTokenMock } = vi.hoisted(() => ({
+const { getByLabelMock, webviewWindowCtorMock, emitMock, getAuthTokenMock, hideMock } = vi.hoisted(() => ({
   getByLabelMock: vi.fn(),
   webviewWindowCtorMock: vi.fn(),
   emitMock: vi.fn(),
   getAuthTokenMock: vi.fn(),
+  hideMock: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/api/webviewWindow", () => ({
@@ -16,6 +17,9 @@ vi.mock("@tauri-apps/api/webviewWindow", () => ({
     { getByLabel: getByLabelMock },
   ),
 }));
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({ hide: hideMock }),
+}));
 vi.mock("@tauri-apps/api/event", () => ({ emit: emitMock }));
 vi.mock("./storage", () => ({ getAuthToken: getAuthTokenMock }));
 
@@ -23,6 +27,7 @@ import {
   openOrFocusFloatingReader,
   openReaderWindow,
   closeReaderWindow,
+  startInAppReading,
   FLOATING_READER_LABEL,
   FLOATING_READER_SET_COMIC_EVENT,
   READER_LABEL,
@@ -134,5 +139,31 @@ describe("closeReaderWindow", () => {
   it("no-ops when no reader window is open", async () => {
     getByLabelMock.mockResolvedValue(null);
     await expect(closeReaderWindow()).resolves.toBeUndefined();
+  });
+});
+
+describe("startInAppReading", () => {
+  beforeEach(() => {
+    getByLabelMock.mockReset().mockResolvedValue(null);
+    webviewWindowCtorMock.mockReset();
+    emitMock.mockReset();
+    getAuthTokenMock.mockReset().mockReturnValue("test-token");
+    hideMock.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("hides the main window BEFORE opening the reader and companion windows", async () => {
+    const callOrder: string[] = [];
+    hideMock.mockImplementation(() => {
+      callOrder.push("hide");
+      return Promise.resolve();
+    });
+    webviewWindowCtorMock.mockImplementation((label: string) => {
+      callOrder.push(`create:${label}`);
+    });
+
+    await startInAppReading(comic({ read_url: "https://comick.dev/comic/x/chapter-3-en" }), "https://comick.dev/comic/x/chapter-3-en");
+
+    expect(hideMock).toHaveBeenCalledTimes(1);
+    expect(callOrder).toEqual(["hide", `create:${READER_LABEL}`, `create:${FLOATING_READER_LABEL}`]);
   });
 });
