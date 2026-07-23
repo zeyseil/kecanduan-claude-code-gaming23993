@@ -34,3 +34,8 @@ coverage/
 
 # backup file dari script migrasi Astra (berisi data user nyata)
 apps/worker/backup-*.json
+
+# Capacitor Android — output build & path SDK lokal mesin masing-masing
+android/app/build/
+android/.gradle/
+android/local.properties
