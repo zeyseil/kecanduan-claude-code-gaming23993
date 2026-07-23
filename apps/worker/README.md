@@ -138,6 +138,27 @@ sendiri ke Vercel:
 
 Vercel free tier (Hobby) cukup untuk kebutuhan personal ini.
 
+`KOMIKU_API_URL` yang sama juga dipakai untuk sumber **"Cari link chapter
+berikutnya"** (Komiku (ID)) — tidak ada env terpisah untuk itu.
+
+## Sumber "Cari link chapter berikutnya"
+
+Selain comick.dev, MangaDex, dan Shinigami (semua nol-setup), ada dua sumber
+bahasa Indonesia tambahan:
+
+- **Komiku (ID)** — pakai `KOMIKU_API_URL` yang sama dengan sumber cover di
+  atas. Kalau kosong, opsi ini tetap tampil di modal tapi selalu balas "belum
+  dikonfigurasi".
+- **Kiryuu (ID)** (`src/lib/kiryuu.ts`, `src/lib/kiryuuChapters.ts`) — nol
+  setup, dipanggil langsung dari Worker (base default `https://v7.kiryuu.to`,
+  override opsional `KIRYUU_API_URL` kalau situsnya ganti versi domain).
+  **Beda penting dari sumber lain**: Kiryuu tidak punya API JSON resmi — Worker
+  membaca HTML mentah situsnya langsung (bukan endpoint terdokumentasi). Ini
+  membuatnya **paling rentan berhenti bekerja** dibanding sumber lain kalau
+  Kiryuu suatu saat mendesain ulang tampilan situsnya; kalau itu terjadi,
+  gejalanya opsi ini selalu balas "tidak ditemukan" walau komiknya ada, dan
+  perbaikannya perlu menyesuaikan ulang parsing regex di dua file di atas.
+
 ## Scripts
 
 - `dev` — `wrangler dev` (mixed mode: KV `AUTH_TOKENS` konek ke cloud lewat `remote = true` di `wrangler.toml`, Durable Object tetap lokal — lihat "Setup Auth" di atas)

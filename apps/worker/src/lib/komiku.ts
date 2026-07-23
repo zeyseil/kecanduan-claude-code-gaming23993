@@ -24,7 +24,7 @@ import type { TypeTag } from "../types/comic";
 import type { MangaDexInfo } from "./mangadex";
 import { pickBestTitleMatch } from "./titleMatch";
 
-interface KomikuResult {
+export interface KomikuResult {
   [key: string]: unknown;
 }
 
@@ -32,10 +32,23 @@ function str(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
+/** Base host resolution — null when the source is disabled (no env). Shared
+ * by fetchKomikuInfo (cover/type) and komikuChapters.ts (chapter lookup) so
+ * there's one definition of "is Komiku configured". */
+export function komikuBase(env: Env): string | null {
+  const base = env.KOMIKU_API_URL?.trim();
+  return base ? base.replace(/\/$/, "") : null;
+}
+
 /** True for a real result. Filters out the "no match" placeholder entry
  * (empty slug/href, no real data) seen live — see module comment. */
-function isRealResult(entry: KomikuResult): boolean {
+export function isRealResult(entry: KomikuResult): boolean {
   return str(entry.slug) !== undefined || str(entry.href) !== undefined;
+}
+
+/** The Komiku `slug` field — used by komikuChapters.ts to fetch chapter detail. */
+export function slugOf(entry: KomikuResult): string | undefined {
+  return str(entry.slug);
 }
 
 /** Title strings under any of the field names Komiku scrapers commonly use. */
@@ -43,6 +56,45 @@ function titlesOf(entry: KomikuResult): string[] {
   if (!isRealResult(entry)) return [];
   const t = str(entry.title) ?? str(entry.judul) ?? str(entry.name);
   return t ? [t] : [];
+}
+
+/**
+ * Searches a Komiku instance and returns the best-matching raw result entry
+ * (with `slug` intact) or null when disabled, the request fails, or no result
+ * is a confident title match. Shared by fetchKomikuInfo and komikuChapters.ts.
+ */
+export async function searchKomikuMatch(title: string, env: Env): Promise<KomikuResult | null> {
+  const base = komikuBase(env);
+  if (!base) return null; // source disabled — silently skipped
+
+  const url = `${base}/search?q=${encodeURIComponent(title)}`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { "User-Agent": "komik-tracker-worker/1.0 (personal comic tracker)" },
+    });
+  } catch (err) {
+    console.error(`searchKomikuMatch: request error for "${title}": ${String(err)}`);
+    return null;
+  }
+  if (!res.ok) {
+    console.error(`searchKomikuMatch: search failed (${res.status} ${res.statusText}) for "${title}"`);
+    return null;
+  }
+
+  const body = (await res.json().catch(() => null)) as unknown;
+  const entries = extractEntries(body);
+  if (entries.length === 0) {
+    console.error(`searchKomikuMatch: no result for "${title}"`);
+    return null;
+  }
+
+  const match = pickBestTitleMatch(entries, title, titlesOf);
+  if (!match) {
+    console.error(`searchKomikuMatch: kandidat untuk "${title}" tidak lolos ambang kemiripan`);
+    return null;
+  }
+  return match;
 }
 
 function coverOf(entry: KomikuResult): string | null {
@@ -63,37 +115,8 @@ function typeTagOf(entry: KomikuResult): TypeTag | null {
  * match (shared acceptance rule — lib/titleMatch.ts).
  */
 export async function fetchKomikuInfo(title: string, env: Env): Promise<MangaDexInfo | null> {
-  const base = env.KOMIKU_API_URL?.trim();
-  if (!base) return null; // source disabled — silently skipped
-
-  const url = `${base.replace(/\/$/, "")}/search?q=${encodeURIComponent(title)}`;
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      headers: { "User-Agent": "komik-tracker-worker/1.0 (personal comic tracker)" },
-    });
-  } catch (err) {
-    console.error(`fetchKomikuInfo: request error for "${title}": ${String(err)}`);
-    return null;
-  }
-  if (!res.ok) {
-    console.error(`fetchKomikuInfo: search failed (${res.status} ${res.statusText}) for "${title}"`);
-    return null;
-  }
-
-  const body = (await res.json().catch(() => null)) as unknown;
-  const entries = extractEntries(body);
-  if (entries.length === 0) {
-    console.error(`fetchKomikuInfo: no result for "${title}"`);
-    return null;
-  }
-
-  const match = pickBestTitleMatch(entries, title, titlesOf);
-  if (!match) {
-    console.error(`fetchKomikuInfo: kandidat untuk "${title}" tidak lolos ambang kemiripan`);
-    return null;
-  }
-
+  const match = await searchKomikuMatch(title, env);
+  if (!match) return null;
   return { cover_url: coverOf(match), type_tag: typeTagOf(match) };
 }
 
