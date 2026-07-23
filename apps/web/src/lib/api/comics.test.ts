@@ -201,14 +201,14 @@ describe("deleteComic", () => {
 });
 
 describe("fetchNextChapterReadUrl", () => {
-  it("mengirim POST ke /comics/fetch-read-url dengan comic_id dan mengembalikan read_url", async () => {
+  it("mengirim POST ke /comics/fetch-read-url dengan title+after_chapter dan mengembalikan read_url", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ read_url: "https://comick.dev/comic/x/y-chapter-2-en" }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await fetchNextChapterReadUrl("1");
+    const result = await fetchNextChapterReadUrl("Solo Leveling", 200);
 
     expect(result).toEqual({ read_url: "https://comick.dev/comic/x/y-chapter-2-en" });
     expect(fetchMock).toHaveBeenCalledWith(
@@ -217,7 +217,7 @@ describe("fetchNextChapterReadUrl", () => {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer test-token" },
         // source default "comick" saat tidak diberikan
-        body: JSON.stringify({ comic_id: "1", source: "comick" }),
+        body: JSON.stringify({ title: "Solo Leveling", after_chapter: 200, source: "comick" }),
       }),
     );
   });
@@ -230,7 +230,7 @@ describe("fetchNextChapterReadUrl", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await fetchNextChapterReadUrl("missing");
+    const result = await fetchNextChapterReadUrl("Missing", 1);
 
     expect(result).toEqual({ read_url: null, reason: "comic tidak ditemukan" });
   });
@@ -243,6 +243,6 @@ describe("fetchNextChapterReadUrl", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(fetchNextChapterReadUrl("1")).rejects.toThrow("unauthorized");
+    await expect(fetchNextChapterReadUrl("X", 1)).rejects.toThrow("unauthorized");
   });
 });

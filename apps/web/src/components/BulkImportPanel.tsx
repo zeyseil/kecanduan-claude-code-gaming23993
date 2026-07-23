@@ -33,8 +33,11 @@ export function BulkImportPanel() {
   // mutates these in place (fills type_tag or leaves it null).
   const [entries, setEntries] = useState<ParsedEntry[]>([]);
   const [parsedFailed, setParsedFailed] = useState<FailedLine[]>([]);
-  const [detectFailed, setDetectFailed] = useState<Array<{ title: string; reason: string }>>([]);
+  // Alasan deteksi gagal per-entri, di-key by entry.id (bukan judul — judul bisa
+  // diedit/duplikat). Ditampilkan inline di baris editable.
+  const [detectFailedById, setDetectFailedById] = useState<Record<string, string>>({});
   const [detecting, setDetecting] = useState(false);
+  const [rowDetecting, setRowDetecting] = useState<string | null>(null);
   const [detectProgress, setDetectProgress] = useState<{ done: number; total: number } | null>(null);
   const [importProgress, setImportProgress] = useState({ done: 0, total: 0 });
   const [importResults, setImportResults] = useState<BulkImportResultItem[]>([]);
@@ -70,7 +73,7 @@ export function BulkImportPanel() {
     const result = parseHistoris(text);
     setEntries(result.ok);
     setParsedFailed(result.failed);
-    setDetectFailed([]);
+    setDetectFailedById({});
     setPhase("preview");
 
     if (result.failed.length > 0) {
@@ -83,25 +86,40 @@ export function BulkImportPanel() {
     }
   };
 
+  // Update judul satu entri (koreksi nama manual). Judul yang dibetulkan
+  // menggantikan judul seutuhnya — dipakai untuk deteksi ulang DAN disimpan
+  // sebagai judul komik saat import. Hapus penanda gagal lama supaya user tahu
+  // baris ini perlu dideteksi ulang.
+  const handleTitleChange = (id: string, value: string) => {
+    setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, title: value } : e)));
+    setDetectFailedById((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
   const handleDetect = async () => {
     setErrorMsg(null);
     setDetecting(true);
-    const titles = needsDetection.map((e) => e.title);
-    setDetectProgress({ done: 0, total: titles.length });
+    // Simpan pasangan id→judul saat request dimulai (judul bisa sudah diedit).
+    const pending = needsDetection.map((e) => ({ id: e.id, title: e.title.trim() }));
+    setDetectProgress({ done: 0, total: pending.length });
 
     try {
       const detected = new Map<string, DetectTypeResultItem>();
-      for (const c of chunk(titles, DETECT_CHUNK_SIZE)) {
-        const results = await detectTypes(c);
+      for (const c of chunk(pending, DETECT_CHUNK_SIZE)) {
+        const results = await detectTypes(c.map((p) => p.title));
         for (const r of results) detected.set(r.title, r);
-        setDetectProgress((prev) => ({ ...(prev ?? { done: 0, total: titles.length }), done: (prev?.done ?? 0) + c.length }));
+        setDetectProgress((prev) => ({ ...(prev ?? { done: 0, total: pending.length }), done: (prev?.done ?? 0) + c.length }));
       }
 
-      const failures: Array<{ title: string; reason: string }> = [];
+      const failures: Record<string, string> = {};
       setEntries((prev) =>
         prev.map((e) => {
           if (e.type_tag !== null) return e;
-          const result = detected.get(e.title);
+          const result = detected.get(e.title.trim());
           if (result?.type_tag) {
             // Carry over the cover detect-type already found (if any) — skips
             // a redundant re-fetch in "Ambil cover" for this entry.
@@ -112,11 +130,12 @@ export function BulkImportPanel() {
               source_api: result.source_api ?? null,
             };
           }
-          failures.push({ title: e.title, reason: "jenis tidak terdeteksi di MangaDex/AniList — tulis (jenis) manual" });
+          failures[e.id] =
+            result?.reason ?? "jenis tidak terdeteksi — betulkan nama atau tulis (jenis) manual";
           return e;
         }),
       );
-      setDetectFailed(failures);
+      setDetectFailedById(failures);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Gagal mendeteksi jenis.");
     } finally {
@@ -124,12 +143,57 @@ export function BulkImportPanel() {
     }
   };
 
+  // Deteksi ulang satu entri pakai judul (yang mungkin sudah dibetulkan).
+  const handleDetectOne = async (id: string, rawTitle: string) => {
+    const title = rawTitle.trim();
+    if (title === "") return;
+    setErrorMsg(null);
+    setRowDetecting(id);
+    try {
+      const [result] = await detectTypes([title]);
+      if (result?.type_tag) {
+        setEntries((prev) =>
+          prev.map((e) =>
+            e.id === id
+              ? {
+                  ...e,
+                  type_tag: result.type_tag,
+                  cover_url: result.cover_url ?? null,
+                  source_api: result.source_api ?? null,
+                }
+              : e,
+          ),
+        );
+        setDetectFailedById((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      } else {
+        setDetectFailedById((prev) => ({
+          ...prev,
+          [id]: result?.reason ?? "jenis tidak terdeteksi — betulkan nama atau tulis (jenis) manual",
+        }));
+      }
+    } catch (err) {
+      setDetectFailedById((prev) => ({
+        ...prev,
+        [id]: err instanceof Error ? err.message : "Gagal mendeteksi jenis.",
+      }));
+    } finally {
+      setRowDetecting(null);
+    }
+  };
+
   const handleConfirmImport = async () => {
     setPhase("importing");
     setErrorMsg(null);
     setImportResults([]);
-    // Only entries with a resolved type_tag are sent.
-    const toImport = entries.filter((e) => e.type_tag !== null);
+    // Only entries with a resolved type_tag are sent. `id` UI-only — dibuang
+    // supaya tidak ikut terkirim ke Worker (BulkEntry tidak punya field itu).
+    const toImport = entries
+      .filter((e) => e.type_tag !== null)
+      .map(({ id, ...rest }) => rest);
     const chunks = chunk(toImport, IMPORT_CHUNK_SIZE);
     setImportProgress({ done: 0, total: toImport.length });
 
@@ -187,7 +251,7 @@ export function BulkImportPanel() {
     setPhase("editing");
     setEntries([]);
     setParsedFailed([]);
-    setDetectFailed([]);
+    setDetectFailedById({});
     setDetectProgress(null);
     setImportProgress({ done: 0, total: 0 });
     setImportResults([]);
@@ -241,6 +305,12 @@ export function BulkImportPanel() {
               <li>
                 <strong>Status 18+ tidak pernah dideteksi otomatis</strong> — harus ditulis eksplisit
                 (mis. <code>(manhwa18)</code>).
+              </li>
+              <li>
+                Kalau deteksi jenis gagal (nama tidak cocok dengan katalog sumber), nama tiap baris
+                bisa dibetulkan langsung di pratinjau lalu dideteksi ulang per-baris. Nama yang
+                dibetulkan <strong>menggantikan judul seutuhnya</strong> — dipakai untuk deteksi,
+                cover, dan disimpan sebagai judul komik.
               </li>
               <li>Judul yang sudah ada akan diupdate chapternya (kalau lebih tinggi), bukan diduplikasi.</li>
               <li>
@@ -341,16 +411,42 @@ export function BulkImportPanel() {
 
                 {needsDetection.length > 0 && (
                   <div className="mt-2 rounded border border-amber-800/60 bg-amber-950/30 p-2 text-xs text-amber-200">
-                    <p>Baris tanpa (jenis) — akan dilewati saat import kalau jenisnya belum terisi:</p>
-                    <ul className="mt-1 max-h-32 overflow-y-auto">
-                      {needsDetection.map((e) => (
-                        <li key={e.title}>{e.title} : ch{e.latest_chapter}</li>
-                      ))}
+                    <p>
+                      Baris tanpa (jenis) — akan dilewati saat import kalau jenisnya belum terisi.
+                      Betulkan nama kalau tidak cocok, lalu deteksi ulang:
+                    </p>
+                    <ul className="mt-1 max-h-64 space-y-1.5 overflow-y-auto">
+                      {needsDetection.map((e) => {
+                        const reason = detectFailedById[e.id];
+                        return (
+                          <li key={e.id}>
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                value={e.title}
+                                onChange={(ev) => handleTitleChange(e.id, ev.target.value)}
+                                aria-label={`Nama komik baris ch${e.latest_chapter}`}
+                                className="min-w-0 flex-1 rounded border border-slate-600 bg-slate-900 px-2 py-1 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
+                              />
+                              <span className="shrink-0 text-amber-300/70">ch{e.latest_chapter}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleDetectOne(e.id, e.title)}
+                                disabled={rowDetecting !== null || detecting || e.title.trim() === ""}
+                                className="shrink-0 rounded-md border border-amber-700 px-2 py-1 text-amber-200 transition hover:bg-amber-900/40 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {rowDetecting === e.id ? "Mendeteksi…" : "Deteksi"}
+                              </button>
+                            </div>
+                            {reason && <p className="mt-0.5 text-rose-300">{reason}</p>}
+                          </li>
+                        );
+                      })}
                     </ul>
                     <button
                       type="button"
                       onClick={handleDetect}
-                      disabled={detecting}
+                      disabled={detecting || rowDetecting !== null}
                       className="mt-2 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
                     >
                       {detecting
@@ -358,16 +454,6 @@ export function BulkImportPanel() {
                         : `Deteksi jenis otomatis (${needsDetection.length} baris)`}
                     </button>
                   </div>
-                )}
-
-                {detectFailed.length > 0 && (
-                  <ul className="mt-2 max-h-32 overflow-y-auto text-xs text-rose-300">
-                    {detectFailed.map((f) => (
-                      <li key={f.title}>
-                        {f.title}: {f.reason}
-                      </li>
-                    ))}
-                  </ul>
                 )}
 
                 {parsedFailed.length > 0 && (

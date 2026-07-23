@@ -416,32 +416,52 @@ comics.post("/detect-type", async (c) => {
 });
 
 // "Cari link chapter berikutnya" (EditComicForm) — finds the chapter right
-// after this comic's stored latest_chapter on comick.dev and returns a direct
-// reader URL. Does NOT write to the store itself; the client fills its local
-// read_url form field and the user still clicks Simpan, same as the cover
-// retry button. comick's `hid` is used transiently inside findNextChapterUrl
-// and is never persisted or returned here.
+// after a given latest_chapter for a given title on the chosen source and
+// returns a direct reader URL. Jalur utama memakai `title`+`after_chapter` dari
+// state form saat itu (belum disimpan) supaya user bisa membetulkan judul/chapter
+// lalu langsung cari tanpa Simpan dulu. Fallback ke lookup `comic_id` (judul+
+// chapter tersimpan) demi klien lama yang belum mengirim title/after_chapter.
+// Does NOT write to the store; the client fills its local read_url form field
+// and the user still clicks Simpan. comick's `hid` dipakai transien di dalam
+// resolver dan tidak pernah dipersist/dikembalikan di sini.
 comics.post("/fetch-read-url", async (c) => {
   const body = await c.req
-    .json<{ comic_id?: unknown; source?: unknown }>()
-    .catch(() => ({}) as { comic_id?: unknown; source?: unknown });
-  if (typeof body.comic_id !== "string" || body.comic_id.trim() === "") {
-    return c.json({ error: "comic_id harus string" }, 400);
-  }
+    .json<{ title?: unknown; after_chapter?: unknown; comic_id?: unknown; source?: unknown }>()
+    .catch(() => ({}) as { title?: unknown; after_chapter?: unknown; comic_id?: unknown; source?: unknown });
+
   // source opsional — default comick.dev supaya klien lama (tanpa field) tetap jalan.
   const source = body.source ?? "comick";
   if (!isChapterSourceId(source)) {
     return c.json({ error: "source tidak dikenali" }, 400);
   }
 
-  const userId = c.get("userId");
-  const store = getComicStore(c.env);
-  const comic = await store.findComic(userId, body.comic_id);
-  if (!comic) {
-    return c.json({ read_url: null, reason: "comic tidak ditemukan" }, 404);
+  let title: string;
+  let afterChapter: number;
+
+  if (
+    typeof body.title === "string" &&
+    body.title.trim() !== "" &&
+    typeof body.after_chapter === "number" &&
+    Number.isFinite(body.after_chapter)
+  ) {
+    // Jalur utama: judul + chapter dari sesi form saat itu.
+    title = body.title.trim();
+    afterChapter = body.after_chapter;
+  } else if (typeof body.comic_id === "string" && body.comic_id.trim() !== "") {
+    // Fallback backward-compat: pakai nilai tersimpan.
+    const userId = c.get("userId");
+    const store = getComicStore(c.env);
+    const comic = await store.findComic(userId, body.comic_id);
+    if (!comic) {
+      return c.json({ read_url: null, reason: "comic tidak ditemukan" }, 404);
+    }
+    title = comic.title;
+    afterChapter = comic.latest_chapter;
+  } else {
+    return c.json({ error: "title+after_chapter atau comic_id wajib" }, 400);
   }
 
-  const result = await resolveNextChapter(source, comic.title, comic.latest_chapter, c.env);
+  const result = await resolveNextChapter(source, title, afterChapter, c.env);
   return c.json(result);
 });
 

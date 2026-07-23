@@ -313,8 +313,8 @@ export function EditComicForm({ comic, onSubmit, onDelete, onCancel }: EditComic
           {/* Beside the centered Edit modal on lg (flanking to its right); stacked/centered on smaller screens. */}
           <div className="lg:absolute lg:left-1/2 lg:ml-[15rem]">
             <ChapterSourceModal
-              comicId={comic.comic_id}
-              comicTitle={comic.title}
+              title={title}
+              afterChapter={Number(chapter) || comic.latest_chapter}
               onResult={(url) => {
                 setReadUrl(url);
                 setShowSourceModal(false);

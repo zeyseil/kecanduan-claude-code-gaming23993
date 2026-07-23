@@ -77,8 +77,9 @@ describe("buildMarkdown", () => {
 
     expect(failed).toEqual([]);
     expect(ok).toEqual([
-      { title: "Berserk", type_tag: "manga", is_adult: false, latest_chapter: 374, status: "ongoing", note: null },
+      { id: expect.any(String), title: "Berserk", type_tag: "manga", is_adult: false, latest_chapter: 374, status: "ongoing", note: null },
       {
+        id: expect.any(String),
         title: "Solo Leveling",
         type_tag: "manhwa",
         is_adult: true,
@@ -87,6 +88,7 @@ describe("buildMarkdown", () => {
         note: null,
       },
       {
+        id: expect.any(String),
         title: "Monster Devourer",
         type_tag: "manhwa",
         is_adult: false,
