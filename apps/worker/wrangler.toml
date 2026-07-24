@@ -1,6 +1,10 @@
 name = "komik-tracker-worker"
 main = "src/index.ts"
 compatibility_date = "2024-11-01"
+# Required by @cloudflare/puppeteer (lib/komikcast.ts), which imports
+# "node:buffer" internally — without this the Worker fails to deploy
+# (error 10021, "No such module node:buffer").
+compatibility_flags = ["nodejs_compat"]
 
 # Keep-alive: sekali sehari jam 03:00 UTC, baca ringan ke Astra supaya DB free
 # tier tidak dihibernasi karena idle. Handler: src/scheduled.ts. Cron hanya
