@@ -12,7 +12,6 @@ function makeEnv(overrides: Partial<Env> = {}): Env {
     RATE_LIMITER: {} as Env["RATE_LIMITER"],
     USER_RATE_LIMITER: {} as Env["USER_RATE_LIMITER"],
     AUTH_TOKENS: {} as Env["AUTH_TOKENS"],
-    BROWSER: {} as Env["BROWSER"],
     ...overrides,
   };
 }

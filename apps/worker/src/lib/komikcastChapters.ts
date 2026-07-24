@@ -1,40 +1,45 @@
-// "Cari link chapter berikutnya" via Komikcast — see komikcast.ts for why this
-// source goes through Cloudflare Browser Rendering instead of a plain fetch().
+// "Cari link chapter berikutnya" via Komikcast's backend API (be.komikcast.cc)
+// — see komikcast.ts for the full history of how this API was discovered
+// (previously scraped via Cloudflare Browser Rendering; the SPA's own JSON
+// API turned out to be unprotected and far simpler/faster to call directly).
 //
-// Like Kiryuu, the chapter list is scraped from raw HTML (no JSON API), and
-// selector markup is unverified against the live site (see komikcast.ts).
-// We use the same argmin strategy as Kiryuu rather than a descending-stop scan
-// (used by comick/Shinigami/Komiku, which get a clean single-purpose list from
-// a real API): without having verified the list order/noise live, argmin is
-// the safer default — it's correct regardless of ordering, at the cost of no
-// early-exit optimization. Revisit if/when the site's actual markup is
-// confirmed live and proven clean.
+// Verified live (curl): GET {api}/series/{slug}/chapters returns
+//   { data: [{ id, data: { slug, title, index, seriesId, ... } }] }
+// sorted descending by `index` for "Solo Leveling" (179.2, 179.1, 179, 178,
+// ... 1, 0) — but every sampled chapter had `data.slug: null`, so we can't
+// rely on a per-chapter slug. We use argmin (not descending-stop) anyway,
+// consistent with kiryuuChapters.ts: order was only verified for ONE series,
+// not guaranteed clean for all of them.
+//
+// READER URL — the *route pattern* `/series/:seriesSlug/chapter/:chapterSlug`
+// was found live in the site's own JS bundle (grep on the built asset, not
+// guessed), but since the API's chapter `slug` is always null, `:chapterSlug`
+// here is a BEST-EFFORT fallback of the numeric chapter index as a string
+// (e.g. "179", "179.1") — a common convention in these SPA readers, but NOT
+// independently confirmed to render the right chapter (curl can't execute the
+// client-side route to verify — every path 200s on an SPA regardless of
+// validity). Documented as a known gap; verify by opening a resulting URL in
+// a real browser (see CLAUDE.md verification steps).
 
 import type { Env } from "../env";
 import type { NextChapterResult } from "./comickChapters";
-import { komikcastBase, searchKomikcastMatch } from "./komikcast";
-import { withBrowserPage } from "./browserRendering";
+import { komikcastApiBase, komikcastReaderBase, searchKomikcastMatch } from "./komikcast";
 import { acquireKomikcastSlot } from "../durable-objects/RateLimiter";
 
-// See the matching ambient declaration in komikcast.ts for why this is
-// needed: page.evaluate() runs in the browser page's own JS realm, which this
-// Worker's tsconfig (`lib`: ES2022 only) has no DOM types for.
-declare const document: {
-  querySelectorAll(selector: string): Iterable<{
-    getAttribute(name: string): string | null;
-    textContent: string | null;
-  }>;
-};
+interface KomikcastChapterEntry {
+  data?: {
+    index?: number;
+  };
+}
 
-interface ParsedChapterLink {
-  chapterNumber: number;
-  href: string;
+interface KomikcastChaptersResponse {
+  data?: KomikcastChapterEntry[];
 }
 
 /**
  * Finds the chapter right after `afterChapter` for `title` on Komikcast and
- * returns its reader URL. Never persists anything itself — callers decide
- * whether/where to store the resulting `read_url` string.
+ * returns a best-effort reader URL to it. Never persists anything itself —
+ * callers decide whether/where to store the resulting `read_url` string.
  */
 export async function findNextChapterUrlKomikcast(
   title: string,
@@ -48,54 +53,42 @@ export async function findNextChapterUrlKomikcast(
   }
 
   await acquireKomikcastSlot(env.RATE_LIMITER);
-  const base = komikcastBase(env);
-  const detailUrl = `${base}/komik/${encodeURIComponent(match.slug)}/`;
+  const apiBase = komikcastApiBase(env);
+  const chaptersUrl = `${apiBase}/series/${encodeURIComponent(match.slug)}/chapters`;
 
-  let links: ParsedChapterLink[];
+  let res: Response;
   try {
-    links = await withBrowserPage(env, async (page) => {
-      await page.goto(detailUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
-      return page.evaluate(() => {
-        const anchors = Array.from(
-          document.querySelectorAll(
-            ".komik_info-chapters a[href], .chapter-link-item, li a[href*='chapter']",
-          ),
-        );
-        const out: { chapterNumber: number; href: string }[] = [];
-        const seen = new Set<string>();
-        for (const a of anchors) {
-          const href = a.getAttribute("href") || "";
-          if (!href || seen.has(href)) continue;
-          const text = (a.textContent || "").trim();
-          const fromUrl = href.match(/chapter-(\d+(?:[.-]\d+)?)/i);
-          const fromText = text.match(/chapter\s*(\d+(?:\.\d+)?)/i);
-          const raw = (fromUrl?.[1] || fromText?.[1] || "").replace(/-/g, ".");
-          const chapterNumber = Number(raw);
-          if (!Number.isFinite(chapterNumber)) continue;
-          seen.add(href);
-          out.push({ chapterNumber, href });
-        }
-        return out;
-      });
-    });
+    res = await fetch(chaptersUrl);
   } catch (err) {
-    console.error(`findNextChapterUrlKomikcast: browser navigation failed for "${detailUrl}": ${String(err)}`);
+    console.error(`findNextChapterUrlKomikcast: request error for "${chaptersUrl}": ${String(err)}`);
+    return { read_url: null, reason: "Gagal mengambil daftar chapter dari Komikcast" };
+  }
+  if (!res.ok) {
+    console.error(`findNextChapterUrlKomikcast: failed (${res.status} ${res.statusText}) for "${chaptersUrl}"`);
     return { read_url: null, reason: "Gagal mengambil daftar chapter dari Komikcast" };
   }
 
-  // Argmin (same reasoning as kiryuuChapters.ts): scan the whole list and keep
-  // the smallest chapter number still greater than afterChapter, rather than
-  // trusting document order.
-  let best: ParsedChapterLink | null = null;
-  for (const link of links) {
-    if (link.chapterNumber <= afterChapter) continue;
-    if (!best || link.chapterNumber < best.chapterNumber) {
-      best = link;
+  const body = (await res.json().catch(() => null)) as KomikcastChaptersResponse | null;
+  const entries = Array.isArray(body?.data) ? body.data : [];
+
+  // Argmin: the smallest chapter index that is still greater than
+  // afterChapter — safe regardless of whether the API's sort order holds for
+  // every series (only verified live for one).
+  let best: number | null = null;
+  for (const entry of entries) {
+    const index = entry.data?.index;
+    if (typeof index !== "number" || !Number.isFinite(index)) continue;
+    if (index <= afterChapter) continue;
+    if (best === null || index < best) {
+      best = index;
     }
   }
 
-  if (!best) {
+  if (best === null) {
     return { read_url: null, reason: "Chapter berikutnya tidak ditemukan di Komikcast" };
   }
-  return { read_url: best.href };
+
+  const readerBase = komikcastReaderBase(env);
+  const read_url = `${readerBase}/series/${match.slug}/chapter/${best}`;
+  return { read_url };
 }

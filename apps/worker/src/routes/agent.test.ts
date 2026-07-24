@@ -98,7 +98,6 @@ const testEnv: Env = {
   AUTH_TOKENS: {
     get: async (key: string) => fakeTokens.get(key) ?? null,
   } as Env["AUTH_TOKENS"],
-  BROWSER: {} as Env["BROWSER"],
 };
 
 // --- Gemini scripting --------------------------------------------------------

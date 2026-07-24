@@ -104,7 +104,6 @@ beforeEach(() => {
     RATE_LIMITER: passRateLimiter as unknown as Env["RATE_LIMITER"],
     USER_RATE_LIMITER: passRateLimiter as unknown as Env["USER_RATE_LIMITER"],
     AUTH_TOKENS: makeAuthTokens(),
-    BROWSER: {} as Env["BROWSER"],
   };
 });
 

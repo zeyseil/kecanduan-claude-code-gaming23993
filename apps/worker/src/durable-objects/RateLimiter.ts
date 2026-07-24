@@ -94,11 +94,11 @@ export async function acquireKiryuuSlot(namespace: DurableObjectNamespace): Prom
   await acquireSlot(namespace, "kiryuu", 5, 3);
 }
 
-/** Komikcast — goes through Cloudflare Browser Rendering (lib/komikcast.ts),
- * NOT a plain fetch() like every other source above. Free-plan quota is only
- * 10 browser-minutes/day account-wide, so this budget protects that quota
- * from one user exhausting it, not just politeness to the target site — kept
- * far tighter than every other source on purpose. */
+/** Komikcast — be.komikcast.cc, an undocumented SPA backend API discovered
+ * live (see lib/komikcast.ts), called directly via fetch() like comick/
+ * Kiryuu (no longer via Cloudflare Browser Rendering — that approach was
+ * abandoned once this cleaner API was found). Kept gentle since it's not a
+ * documented public API and might not be built to handle bursty traffic. */
 export async function acquireKomikcastSlot(namespace: DurableObjectNamespace): Promise<void> {
-  await acquireSlot(namespace, "komikcast", 2, 1 / 30);
+  await acquireSlot(namespace, "komikcast", 5, 3);
 }
