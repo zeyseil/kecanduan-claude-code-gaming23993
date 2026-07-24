@@ -1,98 +1,102 @@
-// Komikcast (Indonesian, general-catalog manga/manhwa/manhua site) lookup via
-// Cloudflare Browser Rendering — see plan history / CLAUDE.md for why: a plain
-// fetch() to v3.komikcast.fit returns 403 (Cloudflare bot-challenge), and a
-// prior attempt to run a separate Playwright scraper on Render was abandoned
-// after repeated card-verification failures on Render's side (unrelated to
-// this code). Browser Rendering runs the headless Chromium INSIDE this
-// Worker's own Cloudflare account instead — no third-party platform, no card.
+// Komikcast (Indonesian, general-catalog manga/manhwa/manhua site) lookup.
 //
-// UNVERIFIED AT WRITE TIME (documented honestly, not a guarantee):
-//   - Whether Komikcast's Cloudflare challenge actually lets Browser Rendering
-//     traffic through. Cloudflare's own docs say Browser Rendering requests
-//     "will always be identified as a bot" — this could go either way (real
-//     Chromium that solves JS challenges vs. a target site's Bot Management
-//     specifically flagging Cloudflare-to-Cloudflare origin). Only a live
-//     deploy + curl can prove this either way.
-//   - The CSS selectors below (`.list-update_item`, `.komik_info-chapters`,
-//     etc.) are a best-effort guess at Komikcast's WordPress-manga-theme
-//     markup, ported from the earlier Render scaffold — NOT verified against
-//     the live site (the site itself blocks the plain fetches this session's
-//     tooling could use to check). Re-verify after deploy; expect to need to
-//     adjust these.
+// HISTORY (see plan/CLAUDE.md for full narrative): this originally went
+// through Cloudflare Browser Rendering, because v3.komikcast.fit itself sits
+// behind a Cloudflare bot-challenge that a plain fetch() can't solve, and the
+// site turned out to be a client-rendered SPA (its `?s=` query string just
+// loads the homepage — NOT a WordPress ?s= search as first assumed). While
+// debugging that live via Browser Rendering's network-response interception,
+// the SPA's own backend API was discovered: `https://be.komikcast.cc` — a
+// clean, UNPROTECTED JSON REST API (confirmed live via curl, no bot-challenge,
+// no browser needed) that the frontend itself calls for all its data. Using
+// it directly is strictly better than scraping the SPA: faster, no Cloudflare
+// Browser Rendering quota (10 browser-minutes/day account-wide) consumed, and
+// no bot-detection risk at all.
 //
-// Selector strategy mirrors kiryuu.ts's argmin approach: no attempt to trust
-// document order for "closest chapter above afterChapter" (see
-// komikcastChapters.ts) — same reasoning as Kiryuu's stray quick-link problem
-// could plausibly also apply here.
+// Verified live (curl):
+//   GET https://be.komikcast.cc/series?title={query}
+//     -> { data: [{ id, data: { title, nativeTitle, slug, format, status,
+//          totalChapters, ... } }], meta: { total, page, lastPage } }
+//     "title" is genuinely a substring/fuzzy search param — e.g. "Solo
+//     Leveling" returns "Solo Leveling: Ragnarok", "Solo Leveling: Side
+//     Story", AND the base "Solo Leveling" (slug "solo-leveling") — the
+//     shared title-match gate (titleMatch.ts) picks the right one.
+//
+// The reader URL pattern (`/series/:seriesSlug/chapter/:chapterSlug`) was
+// found in the site's own JS bundle (grepped live, not guessed) — see
+// komikcastChapters.ts for the caveat on `:chapterSlug` (the API's own
+// `slug` field is always null for chapters, so this is a best-effort
+// numeric-index fallback, NOT independently confirmed to render a chapter).
 
 import type { Env } from "../env";
-import { withBrowserPage } from "./browserRendering";
 import { pickBestTitleMatch } from "./titleMatch";
 
-// page.evaluate() callbacks below run inside the rendered browser page, a
-// different JS realm than this Worker's own runtime — tsconfig's `lib`
-// (ES2022 only, no "dom") has no DOM types for that realm. These ambient
-// declarations are just enough to typecheck the callbacks; they're never
-// invoked in the Worker's own context.
-declare const document: {
-  querySelectorAll(selector: string): Iterable<{
-    querySelector(selector: string): { getAttribute(name: string): string | null; textContent: string | null } | null;
-  }>;
-};
-
-const DEFAULT_BASE = "https://v3.komikcast.fit";
+const DEFAULT_API_BASE = "https://be.komikcast.cc";
+const DEFAULT_READER_BASE = "https://v3.komikcast.fit";
 
 export interface KomikcastMatch {
   title: string;
-  /** Manga path segment, e.g. "solo-leveling" — used to build the detail URL. */
+  nativeTitle: string;
+  /** Series slug, e.g. "solo-leveling" — used to build both the chapters API
+   * URL and the reader URL. */
   slug: string;
 }
 
-/** Base host resolution — Komikcast rotates domains often, so it's
- * overridable via env like Kiryuu's versioned domain. */
-export function komikcastBase(env: Env): string {
-  return (env.KOMIKCAST_API_URL?.trim() || DEFAULT_BASE).replace(/\/$/, "");
+/** Backend API base — overridable in case be.komikcast.cc rotates like the
+ * frontend domain has historically done. */
+export function komikcastApiBase(env: Env): string {
+  return (env.KOMIKCAST_API_URL?.trim() || DEFAULT_API_BASE).replace(/\/$/, "");
 }
 
-interface RawSearchEntry {
-  title: string;
-  slug: string;
+/** Frontend/reader base — separate from the API host; overridable for the
+ * same domain-rotation reason. */
+export function komikcastReaderBase(env: Env): string {
+  return (env.KOMIKCAST_READER_URL?.trim() || DEFAULT_READER_BASE).replace(/\/$/, "");
+}
+
+interface KomikcastSeriesEntry {
+  id?: number;
+  data?: {
+    title?: string;
+    nativeTitle?: string;
+    slug?: string;
+  };
+}
+
+interface KomikcastSeriesSearchResponse {
+  data?: KomikcastSeriesEntry[];
 }
 
 /**
- * Searches Komikcast by title (rendered via a real headless browser to clear
- * any Cloudflare challenge) and returns the best-matching result, or null if
- * navigation fails or no candidate passes the shared title-match acceptance
- * rule (lib/titleMatch.ts, same gate used by every other source).
+ * Searches Komikcast's backend API by title and returns the best-matching
+ * result, or null if the request fails or no candidate passes the shared
+ * title-match acceptance rule (lib/titleMatch.ts, same gate used by every
+ * other source).
  */
 export async function searchKomikcastMatch(title: string, env: Env): Promise<KomikcastMatch | null> {
-  const base = komikcastBase(env);
-  const url = `${base}/?s=${encodeURIComponent(title)}`;
+  const base = komikcastApiBase(env);
+  const url = `${base}/series?title=${encodeURIComponent(title)}`;
 
-  let entries: RawSearchEntry[];
+  let res: Response;
   try {
-    entries = await withBrowserPage(env, async (page) => {
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45000 });
-      return page.evaluate(() => {
-        const items = Array.from(document.querySelectorAll(".list-update_item"));
-        const out: { title: string; slug: string }[] = [];
-        for (const el of items) {
-          const a = el.querySelector("a[href]");
-          const titleEl = el.querySelector(".title, h3, h4");
-          const href = a?.getAttribute("href") || "";
-          const entryTitle = (titleEl?.textContent || a?.getAttribute("title") || "").trim();
-          if (!href || !entryTitle) continue;
-          const m = href.replace(/\/+$/, "").match(/\/([^/]+)$/);
-          const slug = m ? m[1] : "";
-          if (!slug) continue;
-          out.push({ title: entryTitle, slug });
-        }
-        return out;
-      });
-    });
+    res = await fetch(url);
   } catch (err) {
-    console.error(`searchKomikcastMatch: browser navigation failed for "${title}": ${String(err)}`);
+    console.error(`searchKomikcastMatch: request error for "${title}": ${String(err)}`);
     return null;
+  }
+  if (!res.ok) {
+    console.error(`searchKomikcastMatch: search failed (${res.status} ${res.statusText}) for "${title}"`);
+    return null;
+  }
+
+  const body = (await res.json().catch(() => null)) as KomikcastSeriesSearchResponse | null;
+  const rawEntries = Array.isArray(body?.data) ? body.data : [];
+  const entries: KomikcastMatch[] = [];
+  for (const entry of rawEntries) {
+    const slug = entry.data?.slug;
+    const entryTitle = entry.data?.title;
+    if (!slug || !entryTitle) continue;
+    entries.push({ title: entryTitle, nativeTitle: entry.data?.nativeTitle || "", slug });
   }
 
   if (entries.length === 0) {
@@ -100,7 +104,7 @@ export async function searchKomikcastMatch(title: string, env: Env): Promise<Kom
     return null;
   }
 
-  const match = pickBestTitleMatch(entries, title, (e) => [e.title]);
+  const match = pickBestTitleMatch(entries, title, (e) => [e.title, e.nativeTitle].filter(Boolean));
   if (!match) {
     console.error(`searchKomikcastMatch: kandidat untuk "${title}" tidak lolos ambang kemiripan`);
     return null;

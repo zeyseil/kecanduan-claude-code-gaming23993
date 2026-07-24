@@ -95,9 +95,10 @@ export function ChapterSourceModal({
         di-deploy sendiri (KOMIKU_API_URL) — bisa tidak tersedia kalau belum dikonfigurasi. Kiryuu
         dibaca langsung dari halaman situsnya (bukan API resmi) sehingga paling rentan berhenti
         bekerja kalau situsnya berganti tampilan. <strong className="text-slate-400">Komikcast
-        eksperimental</strong> — lewat browser headless untuk melewati proteksi bot situsnya,
-        jadi bisa lebih lambat, dan bisa gagal total kalau kuota harian habis atau proteksi bot
-        tetap menolak. Tiap sumber hanya menemukan judul yang ADA di katalognya; katalog sangat
+        saat ini kemungkinan besar TIDAK berfungsi</strong> — lewat API backend tidak resmi
+        (be.komikcast.cc) yang tampaknya memblokir IP server Cloudflare Worker (walau IP biasa
+        tetap bisa akses), dan URL baca chapter yang dihasilkan belum pernah dikonfirmasi benar-benar
+        membuka chapter yang tepat. Tiap sumber hanya menemukan judul yang ADA di katalognya; katalog sangat
         panjang mungkin tidak ketemu — isi manual kalau begitu.
       </p>
     </div>
