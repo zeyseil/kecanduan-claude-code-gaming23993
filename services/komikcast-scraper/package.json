@@ -1,0 +1,18 @@
+{
+  "name": "komikcast-scraper",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Headless-browser scraper service for Komikcast (chapter link source). Deployed standalone (Render/Docker), called by the komik-tracker Worker.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "install-browser": "patchright install chromium"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "patchright": "^1.52.5"
+  }
+}
