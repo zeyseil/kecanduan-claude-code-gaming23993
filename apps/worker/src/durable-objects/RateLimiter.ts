@@ -93,3 +93,12 @@ export async function acquireShinigamiSlot(namespace: DurableObjectNamespace): P
 export async function acquireKiryuuSlot(namespace: DurableObjectNamespace): Promise<void> {
   await acquireSlot(namespace, "kiryuu", 5, 3);
 }
+
+/** Komikcast — goes through Cloudflare Browser Rendering (lib/komikcast.ts),
+ * NOT a plain fetch() like every other source above. Free-plan quota is only
+ * 10 browser-minutes/day account-wide, so this budget protects that quota
+ * from one user exhausting it, not just politeness to the target site — kept
+ * far tighter than every other source on purpose. */
+export async function acquireKomikcastSlot(namespace: DurableObjectNamespace): Promise<void> {
+  await acquireSlot(namespace, "komikcast", 2, 1 / 30);
+}

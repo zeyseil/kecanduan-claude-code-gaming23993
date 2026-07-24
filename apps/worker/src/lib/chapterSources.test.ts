@@ -17,6 +17,9 @@ vi.mock("./komikuChapters", () => ({
 vi.mock("./kiryuuChapters", () => ({
   findNextChapterUrlKiryuu: vi.fn(async () => ({ read_url: "https://v7.kiryuu.to/manga/x" })),
 }));
+vi.mock("./komikcastChapters", () => ({
+  findNextChapterUrlKomikcast: vi.fn(async () => ({ read_url: "https://v3.komikcast.fit/komik/x/chapter-1/" })),
+}));
 
 const fakeEnv = {} as Env;
 
@@ -27,6 +30,7 @@ describe("isChapterSourceId", () => {
     expect(isChapterSourceId("shinigami")).toBe(true);
     expect(isChapterSourceId("komiku")).toBe(true);
     expect(isChapterSourceId("kiryuu")).toBe(true);
+    expect(isChapterSourceId("komikcast")).toBe(true);
     expect(isChapterSourceId("anilist")).toBe(false);
     expect(isChapterSourceId(undefined)).toBe(false);
     expect(isChapterSourceId(42)).toBe(false);
@@ -57,5 +61,10 @@ describe("resolveNextChapter", () => {
   it("dispatches to the Kiryuu resolver", async () => {
     const result = await resolveNextChapter("kiryuu", "T", 1, fakeEnv);
     expect(result).toEqual({ read_url: "https://v7.kiryuu.to/manga/x" });
+  });
+
+  it("dispatches to the Komikcast resolver", async () => {
+    const result = await resolveNextChapter("komikcast", "T", 1, fakeEnv);
+    expect(result).toEqual({ read_url: "https://v3.komikcast.fit/komik/x/chapter-1/" });
   });
 });

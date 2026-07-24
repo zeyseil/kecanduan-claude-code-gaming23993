@@ -88,14 +88,17 @@ export function ChapterSourceModal({
 
       <p className="mt-3 text-xs text-slate-500">
         <strong className="text-slate-400">Batasan fitur ini:</strong> comick.dev &amp; MangaDex
-        mencari chapter bahasa Inggris; Shinigami, Komiku, dan Kiryuu (semua ID) bahasa Indonesia.
-        Pencarian berdasarkan judul &amp; chapter yang sedang diisi di form Edit saat ini (tidak
-        perlu Simpan dulu). MangaDex sering tidak punya chapter untuk judul populer yang sudah
-        berlisensi resmi — coba comick.dev atau sumber ID. Komiku butuh instance yang di-deploy
-        sendiri (KOMIKU_API_URL) — bisa tidak tersedia kalau belum dikonfigurasi. Kiryuu dibaca
-        langsung dari halaman situsnya (bukan API resmi) sehingga paling rentan berhenti bekerja
-        kalau situsnya berganti tampilan. Tiap sumber hanya menemukan judul yang ADA di katalognya;
-        katalog sangat panjang mungkin tidak ketemu — isi manual kalau begitu.
+        mencari chapter bahasa Inggris; Shinigami, Komiku, Kiryuu, dan Komikcast (semua ID) bahasa
+        Indonesia. Pencarian berdasarkan judul &amp; chapter yang sedang diisi di form Edit saat ini
+        (tidak perlu Simpan dulu). MangaDex sering tidak punya chapter untuk judul populer yang
+        sudah berlisensi resmi — coba comick.dev atau sumber ID. Komiku butuh instance yang
+        di-deploy sendiri (KOMIKU_API_URL) — bisa tidak tersedia kalau belum dikonfigurasi. Kiryuu
+        dibaca langsung dari halaman situsnya (bukan API resmi) sehingga paling rentan berhenti
+        bekerja kalau situsnya berganti tampilan. <strong className="text-slate-400">Komikcast
+        eksperimental</strong> — lewat browser headless untuk melewati proteksi bot situsnya,
+        jadi bisa lebih lambat, dan bisa gagal total kalau kuota harian habis atau proteksi bot
+        tetap menolak. Tiap sumber hanya menemukan judul yang ADA di katalognya; katalog sangat
+        panjang mungkin tidak ketemu — isi manual kalau begitu.
       </p>
     </div>
   );

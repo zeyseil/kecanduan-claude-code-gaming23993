@@ -172,6 +172,7 @@ export const CHAPTER_SOURCES = [
   { id: "shinigami", label: "Shinigami (ID)" },
   { id: "komiku", label: "Komiku (ID)" },
   { id: "kiryuu", label: "Kiryuu (ID)" },
+  { id: "komikcast", label: "Komikcast (ID, eksperimental)" },
 ] as const;
 
 export type ChapterSourceId = (typeof CHAPTER_SOURCES)[number]["id"];
