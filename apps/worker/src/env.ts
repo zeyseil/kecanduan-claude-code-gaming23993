@@ -28,7 +28,16 @@ export interface Env {
    * (lihat lib/kiryuu.ts). Escape-hatch kalau Kiryuu pindah versi domain
    * (v7 -> v8 dst, situs ini pernah beberapa kali). */
   KIRYUU_API_URL?: string;
+  /** (Opsional) Override base URL Komikcast. Kosong = default
+   * https://v3.komikcast.fit (lihat lib/komikcast.ts). Escape-hatch kalau
+   * Komikcast pindah domain (situs ini sering rotasi). */
+  KOMIKCAST_API_URL?: string;
   RATE_LIMITER: DurableObjectNamespace;
   USER_RATE_LIMITER: DurableObjectNamespace;
   AUTH_TOKENS: KVNamespace;
+  /** Headless Chromium terkelola (Cloudflare Browser Rendering) — dipakai
+   * HANYA oleh sumber Komikcast (lib/komikcast.ts) untuk melewati Cloudflare
+   * bot-challenge yang memblokir fetch() biasa. Binding wajib (bukan optional
+   * string seperti env di atas) — lihat [browser] di wrangler.toml. */
+  BROWSER: Fetcher;
 }
